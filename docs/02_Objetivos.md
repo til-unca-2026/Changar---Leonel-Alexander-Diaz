@@ -4,12 +4,9 @@
 
 
 ## Objetivos específicos
-- Permitir que los clientes publiquen solicitudes de servicio indicando la categoría, descripción y características del trabajo que necesitan realizar.
-- Permitir que los trabajadores independientes creen y gestionen un perfil profesional donde puedan indicar sus especialidades, experiencia y trabajos realizados.
-- Facilitar la búsqueda y consulta de trabajadores según su categoría de servicio y ubicación.
-- Permitir que los trabajadores consulten solicitudes de servicio y presenten propuestas indicando una descripción y un presupuesto estimado.
-- Permitir que los clientes consulten las propuestas recibidas y seleccionen al trabajador que consideren más adecuado para realizar el servicio.
-- Registrar y gestionar el estado de las solicitudes y contrataciones durante las distintas etapas del servicio, desde su publicación hasta su finalización.
-- Incorporar un sistema de valoraciones entre clientes y trabajadores que permita construir un historial de reputación basado en contrataciones finalizadas.
-- Permitir que los trabajadores incorporen evidencias de trabajos realizados, como descripciones e imágenes, para complementar su perfil profesional.
-- Proporcionar herramientas básicas de administración para gestionar usuarios, categorías y reportes dentro de la plataforma.
+- Permitir que los usuarios se registren y cuenten con un perfil según su rol de cliente o trabajador independiente.
+-Permitir que los trabajadores independientes indiquen los servicios que ofrecen y presenten información sobre su experiencia y trabajos realizados.
+-Permitir que los clientes publiquen solicitudes de servicio especificando el tipo de servicio que necesitan y una descripción del trabajo.
+-Permitir que los trabajadores consulten las solicitudes de servicio disponibles y envíen propuestas con una descripción y un presupuesto estimado.
+-Permitir que los clientes consulten las propuestas recibidas y seleccionen al trabajador que realizará el servicio.
+-Incorporar un sistema de valoraciones posteriores a la finalización de una contratación, permitiendo que clientes y trabajadores construyan una reputación dentro de la plataforma.
