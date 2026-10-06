@@ -1,77 +1,96 @@
+# Introduccion
+ChangAr se organiza en una arquitectura web cliente-servidor apoyada en un backend como servicio. El frontend, desarrollado con React, Vite y Javascript, presenta las interfaces para clientes, trabajadores y administradores. Desde la interfaz, el SDK de Supabase permite interactuar con los servicios de autenticación, base de datos y almacenamiento.
+
+PostgreSQL conserva la información relacional de la plataforma, mientras que las políticas RLS controlan el acceso a los registros. Supabase Storage administra las fotografías asociadas a solicitudes, portfolios y valoraciones. Finalmente, Supabase Realtime permite actualizar determinadas interfaces cuando se producen cambios relevantes en los datos.
+
+Esta arquitectura reduce la infraestructura que debe desarrollar y mantener una sola persona, lo que resulta adecuado para el plazo de seis semanas. Al mismo tiempo, conserva la separación de responsabilidades entre presentación, datos, autenticación, autorización y archivos.
+
+
+
 ## Elección del Stack Tecnológico
-Para desarrollar ChangAr mediante la metodología de Vibe Coding (desarrollo asistido por IA) y con enfoque de Producto Mínimo Viable (MVP) multiplataforma, la combinación de stack elegida maximiza la velocidad de entrega, reduce el código repetitivo y minimiza los costos operativos iniciales.
+Frontend: React.js + Vite.
+Lenguaje: Javascript.
+Backend y base de datos: Supabase + PostgreSQL.
+Autenticación: Supabase Auth.
+Autorización: roles y políticas RLS.
+Archivos: Supabase Storage para fotos de perfiles y trabajos.
+Actualizaciones en tiempo real: Supabase Realtime, con alcance limitado al MVP.
+Despliegue: alojamiento web con nivel gratuito y verificación de límites.
 
 
-+---------------------------------------------------+
-|    Frontend (Mobile / Web)                        |
-|    React Native + Expo (TypeScript)               |
-+-------------------------+-------------------------+
-                          |
-                          | API REST / Realtime / Auth
-                          v
-+---------------------------------------------------+
-|    Backend como Servicio (BaaS)                   |
-|    Supabase (PostgreSQL + Auth + Storage)         |
-+---------------------------------------------------+
-
-## Frontend: React Native + Expo (TypeScript)
-#### Por qué se eligió: 
-Permite escribir un único código fuente para generar aplicaciones móviles nativas (iOS y Android) y desplegar una versión Web responsiva simultáneamente.Fit con Vibe Coding: Expo abstrae la configuración nativa compleja (Gradle, Xcode), permitiendo que la IA genere interfaces funcionales usando componentes limpios (como NativeWind para React Native). Los asistentes de IA generan código React Native altamente preciso debido al volumen de proyectos existentes en la red.
-
-
-## Backend & Base de Datos: Supabase (PostgreSQL)
-#### Por qué se eligió: 
-Ofrece un backend completo de manera inmediata:
-##### Base de Datos Relacional (PostgreSQL): 
-Imprescindible para vincular adecuadamente entidades complejas (Clientes --> Solicitudes --> Propuestas --> Contrataciones --> Calificaciones).
-##### Autenticación Integrada: 
-Gestiona el registro por teléfono o correo y el manejo de roles de usuario desde el primer minuto.Storage Integrado: Solución inmediata para la carga de imágenes (fotos de reparaciones y portafolios de trabajadores).
-
-##### Fit con Vibe Coding: 
-Al no requerir la creación desde cero de una API REST extensa (Node.js/Express), el tiempo de desarrollo asistido por IA se reduce a escribir las consultas y la UI.
-##### Costo/Beneficio: 
-Su capa gratuita es más que suficiente para validar las hipótesis del MVP con cientos de usuarios activos sin costo de infraestructura.
 
 
 ## Diagrama de Arquitectura del Sistema
-Este esquema muestra cómo interactúan los componentes sin capas innecesarias de complejidad:
-
-+-------------------------------------------------------------------------+
-|                                CLIENTES                                 |
-|                                                                         |
-|    [ App Móvil iOS / Android ]          [ Aplicación Web / Admin ]      |
-|              \                                     /                    |
-+---------------+-----------------------------------+---------------------+
-                |                                   |
-                |  HTTPS / WebSocket                |
-                v                                   v
-+-------------------------------------------------------------------------+
-|                           SUPABASE PLATFORM                             |
-|                                                                         |
-|   +-----------------------+   +-----------------------+   +-----------+ |
-|   |  Supabase Auth        |   |  PostgreSQL Database  |   |  Storage  | |
-|   |                       |   |                       |   |           | |
-|   |  - Login / Roles      |   |  - Usuarios           |   |  - Fotos  | |
-|   |  - JWT Tokens         |   |  - Solicitudes        |   |    de     | |
-|   |                       |   |  - Propuestas         |   |   Trabajos| |
-|   +-----------------------+   |  - Valoraciones       |   +-----------+ |
-|                               |  - RLS / Permisos     |                 |
-|                               +-----------------------+                 |
-+-------------------------------------------------------------------------+
-
-## Componentes y Conexiones:
-#### Cliente / Aplicación (Expo): Renderiza la interfaz de usuario. Consume datos y se comunica directamente con la SDK de Supabase mediante llamadas HTTPS/REST seguras por tokens JWT.
-
-#### Supabase Auth: Valida el tipo de usuario (Cliente, Trabajador o Administrador) mediante políticas de acceso.
-
-#### PostgreSQL Database: Almacena la estructura relacional. Las vistas de bases de datos alimentan directamente los paneles de estadísticas del Administrador.
-
-#### Supabase Storage: Almacena las imágenes comprimidas adjuntas a las publicaciones y perfiles.
+[diagrama](/diagramas%20de%20flujo/diagrama%20general%20v2.png)
 
 
 
+# ESTRUCTURA DE LAS TABLAS
 
-# Diagramas de Flujo
+# Identidad, perfiles y roles
+## Tablas               
+### perfiles                
+id, nombre, apellido, email, rol, activo, created_at    
+- Información común del usuario y su rol.
+### perfiles_trabajador     
+id, descripcion, experiencia, ubicacion                 
+- Datos profesionales específicos.
+### oficios                 
+id, nombre, descripcion, activo                         
+- Catálogo de categorías profesionales.
+### trabajador_oficios      
+trabajador_id, oficio_id                                
+- Relación entre trabajadores y los oficios.
+
+# Relaciones y reglas:
+- Cada perfil se vincula a una identidad de Supabase Auth mediante el mismo UUID.
+- Cada usuario tiene un único rol en el MVP: cliente, trabajador o admin.
+- Un trabajador puede ofrecer varios oficios y un oficio puede estar asociado a muchos trabajadores.
+- El perfil de trabajador almacena los datos profesionales; las fotografías del portfolio se guardan en una tabla y en Storage, no como listas de imágenes dentro del perfil.
+- El rol administrador no se asigna desde el formulario de registro público. Su asignación se realiza mediante un procedimiento administrativo confiable.
+
+La separación entre perfiles y perfiles_trabajador permite agregar en el futuro un rol dual sin tener que duplicar la identidad de la persona. Para el MVP, las políticas y la interfaz seguirán respetando un único rol por usuario
+
+# Solicitudes, propuestas y contrataciones
+
+## Tablas
+### solicitudes    
+id, cliente_id, oficio_id, titulo, descripcion, ubicacion, presupuesto_max, estado, created_at
+- Representa una necesidad de servicio.
+### solicitud_fotos
+id, solicitud_id, storage_path
+- Referencias a fotos que contextualizan el trabajo solicitado.
+### propuestas
+id, solicitud_id, trabajador_id, descripcion, presupuesto, estado, created_at
+- Oferta que un trabajador presenta para una solicitud.
+### contrataciones
+id, propuesta_id, cliente_id, trabajador_id, estado, cancelado_por, motivo_cancelacion, created_at, updated_at
+- Registra el servicio acordado y su evolución.
+
+# Valoraciones y fotografías
+## Tablas
+### valoraciones
+id, contratacion_id, autor_id, destinatario_id, puntuacion, comentario, created_at
+- Registra la valoración de un participante sobre el otro.
+### valoracion_fotos
+id, valoracion_id, storage_path
+- Relaciona las evidencias fotográficas con la valoración.
+### portfolio_fotos
+id, trabajador_id, storage_path, descripcion, created_at
+- Registra las imágenes que se muestran en el portfolio del trabajador.
+
+# Administración
+## Tabla
+### notificaciones
+id, usuario_id, tipo, referencia_id, leida, created_at
+- Conserva las novedades que debe consultar cada usuario.
+
+
+
+
+
+
+# DIAGRAMAS DE FLUJO
 ## Flujo 1: Registro, Selección de Rol y Configuración de Perfil
 
 flowchart TD
@@ -134,30 +153,3 @@ flowchart TD
     C -->|Gestionar Usuarios| E[Listar Usuarios / Bloquear o Desbloquear]
     C -->|Reportes| F[Revisar Denuncias / Moderar Contenido o Reseñas]
 
-
-## Flujo de Contratación Directa (Búsqueda de Profesional)
-
-flowchart TD
-    subgraph Cliente
-        A1([Explorar / Buscar Profesionales]) --> A2[Filtrar por Rubro, Ubicación o Reputación]
-        A2 --> A3[Ver Perfil del Trabajador y Trabajos Realizados]
-        A3 --> A4[Presionar 'Solicitar Presupuesto']
-        A4 --> A5[Completar Detalle de la Necesidad y Fotos]
-        A5 --> A6[Enviar Solicitud Directa a Trabajador]
-        A6 --> A7{¿El trabajador acepta la solicitud?}
-        A7 -->|Aceptado| A8[Recibir Presupuesto / Confirmación]
-        A8 --> A9[Aceptar Presupuesto y Concretar Servicio]
-        A7 -->|Rechazado / Sin respuesta| A10([Notificar al Cliente / Sugerir otros profesionales])
-    end
-
-    subgraph Trabajador
-        B1[Recibir Notificación de Solicitud Directa] --> B2[Revisar Detalle del Pedido]
-        B2 --> B3{Evaluar Disponibilidad}
-        B3 -->|Aceptar| B4[Aceptar y Enviar Presupuesto / Mensaje]
-        B3 -->|Rechazar| B5[Rechazar Solicitud]
-    end
-
-    A6 -. Notificación .-> B1
-    B4 -. Envía respuesta .-> A7
-    B5 -. Envía rechazo .-> A7
-    A9 --> C([Trabajo Contratado en Curso])

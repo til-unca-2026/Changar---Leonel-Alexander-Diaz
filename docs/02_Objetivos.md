@@ -14,8 +14,8 @@
 
 - Permitir que los clientes consulten las propuestas recibidas y seleccionen al trabajador que realizará el servicio.
 
-- Permitir que los clientes exploren el catálogo de trabajadores independientes, consulten sus perfiles y soliciten presupuestos de manera directa a un profesional seleccionado.
-
 - Incorporar un sistema de valoraciones posteriores a la finalización de una contratación, permitiendo que clientes y trabajadores construyan una reputación dentro de la plataforma.
 
 - Incorporar una pantalla para el rol administrador, que pueda gestionar reportes sobre el funcionamiento de la aplicación y sobre usuarios. El administrador debe poder visualizar estadísticas sobre el uso de la aplicación.
+
+
