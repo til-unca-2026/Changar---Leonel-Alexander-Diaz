@@ -18,7 +18,8 @@ Actualizaciones en tiempo real: Supabase Realtime, con alcance limitado al MVP.
 Despliegue: alojamiento web con nivel gratuito y verificación de límites.
 
 
-
+## Componentes del sistema
+[Componentes](/docs/componentes.png)
 
 ## Diagrama de Arquitectura del Sistema
 [diagrama](/diagramas%20de%20flujo/diagrama%20general%20v2.png)
