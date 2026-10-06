@@ -133,3 +133,31 @@ flowchart TD
     C -->|Métricas| D[Visualizar Estadísticas: Registros, Solicitudes, Contrataciones]
     C -->|Gestionar Usuarios| E[Listar Usuarios / Bloquear o Desbloquear]
     C -->|Reportes| F[Revisar Denuncias / Moderar Contenido o Reseñas]
+
+
+## Flujo de Contratación Directa (Búsqueda de Profesional)
+
+flowchart TD
+    subgraph Cliente
+        A1([Explorar / Buscar Profesionales]) --> A2[Filtrar por Rubro, Ubicación o Reputación]
+        A2 --> A3[Ver Perfil del Trabajador y Trabajos Realizados]
+        A3 --> A4[Presionar 'Solicitar Presupuesto']
+        A4 --> A5[Completar Detalle de la Necesidad y Fotos]
+        A5 --> A6[Enviar Solicitud Directa a Trabajador]
+        A6 --> A7{¿El trabajador acepta la solicitud?}
+        A7 -->|Aceptado| A8[Recibir Presupuesto / Confirmación]
+        A8 --> A9[Aceptar Presupuesto y Concretar Servicio]
+        A7 -->|Rechazado / Sin respuesta| A10([Notificar al Cliente / Sugerir otros profesionales])
+    end
+
+    subgraph Trabajador
+        B1[Recibir Notificación de Solicitud Directa] --> B2[Revisar Detalle del Pedido]
+        B2 --> B3{Evaluar Disponibilidad}
+        B3 -->|Aceptar| B4[Aceptar y Enviar Presupuesto / Mensaje]
+        B3 -->|Rechazar| B5[Rechazar Solicitud]
+    end
+
+    A6 -. Notificación .-> B1
+    B4 -. Envía respuesta .-> A7
+    B5 -. Envía rechazo .-> A7
+    A9 --> C([Trabajo Contratado en Curso])
