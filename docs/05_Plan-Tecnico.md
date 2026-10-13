@@ -7,6 +7,8 @@ negocio y la arquitectura del frontend de ChangAr, tomando como base
 **Tipo de producto:** aplicación web (cliente-servidor en el navegador). Sin app nativa,
 sin tiendas de apps. Acceso por URL, diseño responsive mobile-first.
 
+**Moneda:** pesos argentinos (ARS), formato `$ 1.234.567`.
+
 ---
 
 # DECISIONES TOMADAS
@@ -17,9 +19,18 @@ sin tiendas de apps. Acceso por URL, diseño responsive mobile-first.
 | 2 | Un trabajador puede proponer un presupuesto mayor al `presupuesto_max` del cliente: **se advierte en la UI, no se bloquea** | Pantalla comparar propuestas |
 | 3 | Estilos con **Tailwind CSS** | Proyecto frontend |
 | 4 | Se agregan la tabla `reportes` y el campo `perfiles.avatar_path` (pedidos por la doc pero sin modelo) | Migración |
-| 5 | Para enviar propuestas el perfil debe estar completo (oficios + descripción + ubicación). **Sin antigüedad mínima**: los trabajadores nuevos pueden postular | RPC `enviar_propuesta` |
+| 5 | Para enviar propuestas el perfil debe estar completo (al menos 1 oficio + descripción + ubicación). **Sin antigüedad mínima**: los trabajadores nuevos pueden postular | RPC `enviar_propuesta` |
 | 6 | Ubicación: **solo texto libre**, sin mapas ni GPS | Formularios |
 | 7 | Notificaciones solo dentro de la app (sin push ni email), generadas por triggers | Tabla `notificaciones` |
+| 8 | El teléfono vive en `perfil_contacto` y **solo lo ve la contraparte con la que existe una contratación activa o completada** | Tabla `perfil_contacto` + RLS |
+| 9 | El **email no es visible** para otros usuarios; se protege con privilegios por columna | RLS / grants |
+| 10 | El bloqueo se hace **real**: `activo = false` + ban en Supabase Auth vía Edge Function | Edge Function + RPC |
+| 11 | `presupuesto_max` es **opcional**: la advertencia por excederlo aplica solo cuando el cliente cargó un monto | Formulario / UI |
+| 12 | Los **trabajadores pueden proponer oficios nuevos**, que **requieren aprobación del admin**. Se evitan duplicados por mayúsculas/acentos (columna normalizada) y por typos (sugerencia difusa `pg_trgm`). El admin puede fusionar duplicados | RPCs de oficios + RLS |
+| 13 | Un oficio **pendiente cuenta para que el trabajador pueda postular**, pero **no se muestra público** hasta ser aprobado | RPC `enviar_propuesta` + RLS de oficios |
+| 14 | El panel del admin muestra **métricas completas**: totales, tendencia 30 días, top de oficios y cola de pendientes | RPC `admin_metricas` |
+| 15 | El **fin de servicio requiere doble validación** (cliente y trabajador). La **cancelación es unilateral**. En ambos casos ambas partes pueden aportar texto y fotos de evidencia | RPCs `confirmar_fin`, `cancelar_contratacion`, `agregar_respuesta` |
+| 16 | La solicitud se **previsualiza y se puede editar entero** antes de confirmar la publicación. Una vez publicada no se edita | Pantalla nueva-solicitud (paso de preview) |
 
 > **Consecuencia de la decisión 5:** como los trabajadores nuevos arrancan con 0 reseñas y la
 > reputación es la única señal de confianza, el perfil debe mostrar un badge **"Nuevo"** en
@@ -36,11 +47,15 @@ sin tiendas de apps. Acceso por URL, diseño responsive mobile-first.
 create type rol_usuario        as enum ('cliente', 'trabajador', 'admin');
 create type estado_solicitud   as enum ('abierta', 'asignada', 'cerrada', 'cancelada');
 create type estado_propuesta   as enum ('enviada', 'aceptada', 'rechazada', 'retirada');
-create type estado_contratacion as enum ('en_curso', 'completado', 'cancelado');
+create type estado_contratacion as enum ('en_curso', 'pendiente_confirmacion', 'completado', 'cancelado');
+create type estado_oficio      as enum ('pendiente', 'activo', 'inactivo');
+create type tipo_evidencia     as enum ('fin', 'cancelacion', 'respuesta');
 create type tipo_notificacion  as enum (
   'nueva_propuesta', 'propuesta_aceptada', 'propuesta_rechazada',
   'contratacion_creada', 'contratacion_completada', 'contratacion_cancelada',
-  'nueva_valoracion', 'cuenta_bloqueada'
+  'contratacion_pendiente_confirmacion',
+  'nueva_valoracion', 'cuenta_bloqueada',
+  'oficio_pendiente', 'oficio_aprobado', 'oficio_rechazado'
 );
 create type tipo_referencia   as enum ('solicitud', 'valoracion', 'perfil');
 create type estado_reporte    as enum ('pendiente', 'resuelto', 'descartado');
@@ -67,11 +82,21 @@ create table perfiles_trabajador (
   ubicacion   text
 );
 
+-- NUEVO: el teléfono es necesario porque no hay chat (ver decisión 8).
+create table perfil_contacto (
+  perfil_id  uuid primary key references perfiles(id) on delete cascade,
+  telefono   text not null,
+  updated_at timestamptz not null default now()
+);
+
 create table oficios (
-  id          uuid primary key default gen_random_uuid(),
-  nombre      text not null unique,
-  descripcion text,
-  activo      boolean not null default true
+  id                 uuid primary key default gen_random_uuid(),
+  nombre             text not null,
+  nombre_normalizado text,                         -- llenado por trigger (decisión 12)
+  descripcion        text,
+  estado             estado_oficio not null default 'activo',   -- el seed entra activo
+  creado_por         uuid references perfiles(id),
+  created_at         timestamptz not null default now()
 );
 
 create table trabajador_oficios (
@@ -92,6 +117,8 @@ create table trabajador_oficios (
 - Las fotos del portfolio viven en `portfolio_fotos` + Storage, no como listas en el perfil.
 - La separación `perfiles` / `perfiles_trabajador` permite agregar un rol dual en el futuro
   sin duplicar la identidad.
+- Los oficios nacen `pendiente` cuando los crea un trabajador y `activo` cuando los crea el
+  admin o vienen del seed.
 
 ## Solicitudes, propuestas y contrataciones
 
@@ -103,7 +130,7 @@ create table solicitudes (
   titulo         text not null,
   descripcion    text not null,
   ubicacion      text not null,
-  presupuesto_max numeric(12,2),
+  presupuesto_max numeric(12,2),                       -- opcional (decisión 11)
   estado        estado_solicitud not null default 'abierta',
   created_at    timestamptz not null default now()
 );
@@ -136,6 +163,28 @@ create table contrataciones (
   motivo_cancelacion text,
   created_at         timestamptz not null default now(),
   updated_at         timestamptz not null default now()
+);
+
+-- NUEVO (decisión 15): evidencia textual/fotográfica del fin, la cancelación o la
+-- respuesta de la contraparte. La fuente de verdad de la doble validación es el
+-- conteo de evidencias tipo 'fin'.
+create table contratacion_evidencias (
+  id              uuid primary key default gen_random_uuid(),
+  contratacion_id uuid not null references contrataciones(id) on delete cascade,
+  autor_id        uuid not null references perfiles(id),
+  tipo            tipo_evidencia not null,
+  comentario      text,
+  created_at      timestamptz not null default now()
+);
+
+-- Una sola evidencia de tipo 'fin' por participante por contratación.
+create unique index on contratacion_evidencias (contratacion_id, autor_id)
+  where tipo = 'fin';
+
+create table contratacion_evidencia_fotos (
+  id           uuid primary key default gen_random_uuid(),
+  evidencia_id uuid not null references contratacion_evidencias(id) on delete cascade,
+  storage_path text not null
 );
 ```
 
@@ -195,6 +244,13 @@ create table reportes (
 );
 ```
 
+## Extensiones
+
+```sql
+create extension if not exists pg_trgm;    -- sugerencia difusa de oficios (decisión 12)
+create extension if not exists unaccent;   -- normalización de acentos
+```
+
 ## Índices
 
 ```sql
@@ -207,6 +263,11 @@ create index on contrataciones (trabajador_id);
 create index on notificaciones (usuario_id, leida);
 create index on valoraciones (destinatario_id);
 create index on reportes (estado, created_at desc);
+
+-- Oficios: unicidad normalizada + búsqueda difusa
+create unique index on oficios (nombre_normalizado);
+create index on oficios using gin (nombre_normalizado gin_trgm_ops);
+create index on oficios (estado);
 ```
 
 ## Vista de reputación
@@ -215,7 +276,9 @@ El Flujo 3 pide *"actualizar promedio de estrellas y perfiles"* pero no existe d
 guardarlo. Se resuelve con una vista: siempre consistente y sin triggers que mantener.
 
 ```sql
-create view v_perfil_publico as
+create view v_perfil_publico
+with (security_invoker = true)          -- respeta RLS y los grants por columna
+as
 select p.id, p.nombre, p.apellido, p.avatar_path, p.rol, p.activo, p.created_at,
        pt.descripcion, pt.experiencia, pt.ubicacion,
        coalesce(avg(v.puntuacion), 0)::numeric(3,2) as puntuacion_promedio,
@@ -226,6 +289,10 @@ left join perfiles_trabajador pt on pt.id = p.id
 left join valoraciones v        on v.destinatario_id = p.id
 group by p.id, pt.id;
 ```
+
+Para el perfil público de un trabajador, sus oficios se listan aparte filtrando
+`trabajador_oficios` por oficios `activo` (los `pendiente` no se muestran a terceros,
+según la decisión 13).
 
 Si más adelante el panel de admin se pone lento, se puede migrar a columnas cacheadas
 (`puntuacion_promedio`, `valoraciones_count`) mantenidas por trigger sobre `valoraciones`.
@@ -249,15 +316,25 @@ as $$ select exists (
 
 ## Protección de columnas sensibles
 
-`es_admin()` protege la lectura, pero una policy `for update using (id = auth.uid())`
-también permitiría al usuario cambiar su propio `rol` o `activo`. Se controla con
-privilegios a nivel de columna: el usuario solo puede tocar su nombre, apellido y avatar.
-El `rol` y `activo` se modifican únicamente mediante RPCs de administración.
+Una policy `for update using (id = auth.uid())` dejaría al usuario cambiar su propio `rol`
+o `activo`. Y una lectura abierta expondría el `email` de todos (decisión 9). Ambas cosas
+se controlan con privilegios a nivel de columna: el usuario solo puede **leer** datos
+públicos y **escribir** su nombre, apellido y avatar. El `rol`, el `activo` y el email
+quedan fuera del alcance del usuario común.
 
 ```sql
+-- Escritura: solo estas columnas
 revoke update on perfiles from authenticated;
 grant  update (nombre, apellido, avatar_path) on perfiles to authenticated;
+
+-- Lectura: sin email (decisión 9)
+revoke select on perfiles from authenticated;
+grant  select (id, nombre, apellido, avatar_path, rol, activo, created_at)
+  on perfiles to authenticated;
 ```
+
+El propio email el usuario lo obtiene de la sesión (`supabase.auth.getUser()`), no de
+`perfiles`. El admin lo consulta mediante `admin_listar_usuarios()`.
 
 ## Policies por tabla
 
@@ -282,12 +359,46 @@ create policy "pt alta propia" on perfiles_trabajador
 create policy "pt edicion propia" on perfiles_trabajador
   for update using (id = auth.uid()) with check (id = auth.uid());
 
--- ===== oficios =====
+-- ===== perfil_contacto (decisión 8) =====
+-- Lectura: el dueño, el admin, o la contraparte con una contratación no cancelada.
+alter table perfil_contacto enable row level security;
+create policy "contacto lectura duenio o contraparte" on perfil_contacto
+  for select to authenticated using (
+    perfil_id = auth.uid()
+    or es_admin()
+    or exists (
+      select 1 from contrataciones c
+      where c.estado in ('en_curso', 'pendiente_confirmacion', 'completado')
+        and (
+          (c.cliente_id = auth.uid()    and c.trabajador_id = perfil_contacto.perfil_id)
+          or (c.trabajador_id = auth.uid() and c.cliente_id = perfil_contacto.perfil_id)
+        )
+    )
+  );
+create policy "contacto alta propia" on perfil_contacto
+  for insert with check (perfil_id = auth.uid());
+create policy "contacto edicion propia" on perfil_contacto
+  for update using (perfil_id = auth.uid()) with check (perfil_id = auth.uid());
+
+-- ===== oficios (decisiones 12 y 13) =====
+-- Lectura: activos para todos; pendientes solo su creador y el admin; inactivos solo admin.
 alter table oficios enable row level security;
 create policy "oficios lectura" on oficios
-  for select to authenticated using (activo or es_admin());
-create policy "oficios escritura admin" on oficios
-  for all using (es_admin()) with check (es_admin());
+  for select to authenticated using (
+    estado = 'activo'
+    or es_admin()
+    or (estado = 'pendiente' and creado_por = auth.uid())
+  );
+-- Alta: cualquier autenticado, pero forzada a 'pendiente' (el admin puede crear activo).
+-- En la práctica el alta ocurre por la RPC crear_oficio, que además asocia al trabajador.
+create policy "oficios alta" on oficios
+  for insert with check (
+    creado_por = auth.uid() and (estado = 'pendiente' or es_admin())
+  );
+create policy "oficios edicion admin" on oficios
+  for update using (es_admin()) with check (es_admin());
+create policy "oficios borrado admin" on oficios
+  for delete using (es_admin());
 
 -- ===== trabajador_oficios =====
 alter table trabajador_oficios enable row level security;
@@ -338,12 +449,41 @@ create policy "propuestas borrado admin" on propuestas
 
 -- ===== contrataciones =====
 -- Lectura para participantes. Las escrituras van SOLO por RPC (security definer),
--- nunca directo desde el cliente: crearlas manualmente rompería la máquina de estados.
+-- nunca directo desde el cliente: crearlas o modificarlas a mano rompería la máquina de estados.
 alter table contrataciones enable row level security;
 create policy "contrataciones lectura participantes" on contrataciones
   for select to authenticated using (
     cliente_id = auth.uid() or trabajador_id = auth.uid() or es_admin()
   );
+
+-- ===== contratacion_evidencias (decisión 15) =====
+-- Lectura para participantes; sin INSERT (solo por RPC); borrado solo admin.
+alter table contratacion_evidencias enable row level security;
+create policy "evidencias lectura participantes" on contratacion_evidencias
+  for select to authenticated using (
+    es_admin()
+    or exists (
+      select 1 from contrataciones c
+      where c.id = contratacion_id
+        and (c.cliente_id = auth.uid() or c.trabajador_id = auth.uid())
+    )
+  );
+create policy "evidencias borrado admin" on contratacion_evidencias
+  for delete using (es_admin());
+
+alter table contratacion_evidencia_fotos enable row level security;
+create policy "evidencias fotos lectura participantes" on contratacion_evidencia_fotos
+  for select to authenticated using (
+    es_admin()
+    or exists (
+      select 1 from contratacion_evidencias e
+      join contrataciones c on c.id = e.contratacion_id
+      where e.id = evidencia_id
+        and (c.cliente_id = auth.uid() or c.trabajador_id = auth.uid())
+    )
+  );
+create policy "evidencias fotos borrado admin" on contratacion_evidencia_fotos
+  for delete using (es_admin());
 
 -- ===== valoraciones =====
 alter table valoraciones enable row level security;
@@ -383,7 +523,7 @@ create policy "notif marcar leida" on notificaciones
   for update using (usuario_id = auth.uid()) with check (usuario_id = auth.uid());
 create policy "notif borrado admin" on notificaciones
   for delete using (es_admin());
--- Sin policy de insert: las notificaciones las crean solo los triggers.
+-- Sin policy de insert: las notificaciones las crean solo los triggers y las RPCs.
 
 -- ===== reportes =====
 alter table reportes enable row level security;
@@ -401,7 +541,7 @@ create policy "reportes resolucion admin" on reportes
 
 ## Storage
 
-Cuatro buckets, todos de **lectura pública** y **escritura restringida a la carpeta del
+Cinco buckets, todos de **lectura pública** y **escritura restringida a la carpeta del
 propio usuario**:
 
 | Bucket | Contenido | Path |
@@ -410,9 +550,10 @@ propio usuario**:
 | `solicitud-fotos` | Fotos de la solicitud | `{user_id}/{solicitud_id}/{n}.{ext}` |
 | `portfolio-fotos` | Portfolio del trabajador | `{user_id}/{n}.{ext}` |
 | `valoracion-fotos` | Evidencia de la valoración | `{user_id}/{contratacion_id}/{n}.{ext}` |
+| `contratacion-evidencias` | Evidencia de fin / cancelación / respuesta | `{user_id}/{contratacion_id}/{n}.{ext}` |
 
 ```sql
--- Patrón repetido en los 4 buckets
+-- Patrón repetido en los 5 buckets
 create policy "escritura solo en carpeta propia"
 on storage.objects for insert to authenticated
 with check (
@@ -421,8 +562,10 @@ with check (
 );
 ```
 
-Límites a definir en la configuración del bucket: tamaño máximo por archivo (recomendado
-5 MB) y tipos permitidos (`image/jpeg`, `image/png`, `image/webp`).
+**Límites definidos:** máx. 5 MB por archivo y tipos `image/jpeg`, `image/png`,
+`image/webp`.
+
+**Cantidad de fotos:** 5 por solicitud, 5 por evidencia de contratación, 3 por valoración.
 
 ---
 
@@ -454,6 +597,13 @@ begin
     new.email,
     coalesce((new.raw_user_meta_data->>'rol')::rol_usuario, 'cliente')
   );
+
+  -- Teléfono (decisión 8): el registro lo pide para todos los roles.
+  if new.raw_user_meta_data->>'telefono' is not null then
+    insert into perfil_contacto (perfil_id, telefono)
+    values (new.id, new.raw_user_meta_data->>'telefono');
+  end if;
+
   return new;
 end $$;
 
@@ -464,6 +614,146 @@ create trigger on_auth_user_created
 
 El perfil se crea por trigger y no por `INSERT` del cliente para que ningún usuario pueda
 darse de alta sin perfil o con un rol manipulado.
+
+## Oficios
+
+### Normalización y búsqueda difusa (decisión 12)
+
+```sql
+-- Normaliza: minúsculas, sin acentos, sin espacios sobrantes.
+create or replace function public.normalizar_oficio(t text) returns text
+language sql stable as $$
+  select regexp_replace(lower(unaccent(btrim(t))), '\s+', ' ', 'g');
+$$;
+
+-- Llena la columna normalizada en cada alta/edición (unaccent no es inmutable,
+-- por eso se usa un trigger y no un índice funcional).
+create or replace function public.tg_normalizar_oficio() returns trigger
+language plpgsql as $$
+begin
+  new.nombre_normalizado := normalizar_oficio(new.nombre);
+  return new;
+end $$;
+
+create trigger tr_normalizar_oficio
+  before insert or update of nombre on oficios
+  for each row execute function public.tg_normalizar_oficio();
+```
+
+```sql
+-- Sugerencias para la UI: coincidencia por subcadena + similitud difusa (atrapa typos).
+create or replace function public.buscar_oficios(p_query text)
+returns table (id uuid, nombre text, similitud real)
+language sql stable security definer set search_path = public
+as $$
+  select o.id, o.nombre,
+         similarity(o.nombre_normalizado, normalizar_oficio(p_query)) as similitud
+  from oficios o
+  where o.estado = 'activo'
+    and (
+      o.nombre_normalizado like '%' || normalizar_oficio(p_query) || '%'
+      or similarity(o.nombre_normalizado, normalizar_oficio(p_query)) > 0.3
+    )
+  order by similitud desc
+  limit 10;
+$$;
+```
+
+### Crear oficio (sin duplicados)
+
+```sql
+create or replace function public.crear_oficio(p_nombre text)
+returns uuid language plpgsql security definer set search_path = public
+as $$
+declare v_id uuid; v_norm text; v_estado estado_oficio;
+begin
+  if p_nombre is null or btrim(p_nombre) = '' then
+    raise exception 'nombre_vacio';
+  end if;
+
+  v_norm := normalizar_oficio(p_nombre);
+
+  -- ¿Ya existe con el mismo nombre normalizado? (evita duplicados por mayúsculas/acentos)
+  select id, estado into v_id, v_estado from oficios where nombre_normalizado = v_norm;
+  if found then
+    if v_estado = 'inactivo' then
+      raise exception 'oficio_no_permitido';   -- fue rechazado antes
+    end if;
+    -- asociar al trabajador que lo pidió
+    if exists (select 1 from perfiles where id = auth.uid() and rol = 'trabajador') then
+      insert into trabajador_oficios (trabajador_id, oficio_id)
+      values (auth.uid(), v_id) on conflict do nothing;
+    end if;
+    return v_id;
+  end if;
+
+  insert into oficios (nombre, estado, creado_por)
+  values (btrim(p_nombre), 'pendiente', auth.uid())
+  returning id into v_id;
+
+  if exists (select 1 from perfiles where id = auth.uid() and rol = 'trabajador') then
+    insert into trabajador_oficios (trabajador_id, oficio_id)
+    values (auth.uid(), v_id) on conflict do nothing;
+  end if;
+
+  -- avisar a los administradores
+  insert into notificaciones (usuario_id, tipo, referencia_id)
+  select p.id, 'oficio_pendiente', v_id from perfiles p where p.rol = 'admin';
+
+  return v_id;
+end $$;
+```
+
+### Aprobar / rechazar y fusionar (admin)
+
+```sql
+create or replace function public.admin_aprobar_oficio(
+  p_oficio_id uuid, p_aprobar boolean)
+returns void language plpgsql security definer set search_path = public
+as $$
+declare v_creador uuid;
+begin
+  if not es_admin() then raise exception 'sin_permiso'; end if;
+
+  update oficios
+     set estado = case when p_aprobar then 'activo'::estado_oficio
+                                  else 'inactivo'::estado_oficio end
+   where id = p_oficio_id
+  returning creado_por into v_creador;
+
+  if not found then raise exception 'oficio_no_encontrado'; end if;
+
+  if v_creador is not null then
+    insert into notificaciones (usuario_id, tipo, referencia_id)
+    values (v_creador,
+            case when p_aprobar then 'oficio_aprobado' else 'oficio_rechazado' end,
+            p_oficio_id);
+  end if;
+end $$;
+
+create or replace function public.admin_fusionar_oficios(
+  p_origen uuid, p_destino uuid)
+returns void language plpgsql security definer set search_path = public
+as $$
+begin
+  if not es_admin() then raise exception 'sin_permiso'; end if;
+  if p_origen = p_destino then raise exception 'mismo_oficio'; end if;
+
+  -- reasignar trabajadores y solicitudes del duplicado al destino
+  insert into trabajador_oficios (trabajador_id, oficio_id)
+  select trabajador_id, p_destino from trabajador_oficios where oficio_id = p_origen
+  on conflict do nothing;
+  delete from trabajador_oficios where oficio_id = p_origen;
+
+  update solicitudes set oficio_id = p_destino where oficio_id = p_origen;
+
+  -- el duplicado queda inactivo
+  update oficios set estado = 'inactivo' where id = p_origen;
+end $$;
+```
+
+> Al rechazar un oficio, el trabajador que lo pidió recibe la notificación. Si era su único
+> oficio, queda con perfil incompleto y no podrá postular hasta elegir o crear otro.
 
 ## `enviar_propuesta`
 
@@ -478,14 +768,20 @@ begin
   if not found then raise exception 'solicitud_no_encontrada'; end if;
   if v_sol.estado <> 'abierta' then raise exception 'solicitud_no_abierta'; end if;
 
-  -- Decisión 5: perfil completo, SIN antigüedad mínima
+  -- Decisiones 5 y 13: perfil completo. Un oficio propio 'pendiente' cuenta para postular
+  -- (aunque no se muestre público). Sin antigüedad mínima.
   if not exists (
     select 1 from perfiles_trabajador pt
     where pt.id = auth.uid()
       and pt.descripcion is not null
       and pt.ubicacion   is not null
-      and exists (select 1 from trabajador_oficios t
-                  where t.trabajador_id = auth.uid())
+      and exists (
+        select 1 from trabajador_oficios t
+        join oficios o on o.id = t.oficio_id
+        where t.trabajador_id = auth.uid()
+          and (o.estado = 'activo'
+               or (o.estado = 'pendiente' and o.creado_por = auth.uid()))
+      )
   ) then
     raise exception 'perfil_incompleto';
   end if;
@@ -559,48 +855,97 @@ begin
 end $$;
 ```
 
-## `completar_contratacion`
+## `confirmar_fin` — doble validación (decisión 15)
 
-Solo el cliente. Habilita las valoraciones de ambos lados.
+Reemplaza al viejo `completar_contratacion`. **No se completa con una sola confirmación**:
+la contratación pasa a `pendiente_confirmacion` con la primera y a `completado` con la
+segunda. Cada parte adjunta texto y fotos con su confirmación.
 
 ```sql
-create or replace function public.completar_contratacion(p_contratacion_id uuid)
-returns void language plpgsql security definer set search_path = public
+create or replace function public.confirmar_fin(
+  p_contratacion_id uuid, p_comentario text, p_fotos text[])
+returns estado_contratacion
+language plpgsql security definer set search_path = public
 as $$
 declare
   c contrataciones;
-  v_solicitud_id uuid;
+  v_otro uuid;
+  v_evidencia uuid;
+  v_confirmaciones int;
 begin
   select * into c from contrataciones where id = p_contratacion_id for update;
   if not found then raise exception 'contratacion_no_encontrada'; end if;
-  if auth.uid() <> c.cliente_id then raise exception 'solo_el_cliente'; end if;
-  if c.estado <> 'en_curso' then raise exception 'estado_invalido'; end if;
+  if auth.uid() not in (c.cliente_id, c.trabajador_id) then
+    raise exception 'sin_permiso';
+  end if;
+  if c.estado not in ('en_curso', 'pendiente_confirmacion') then
+    raise exception 'estado_invalido';
+  end if;
 
-  select s.id into v_solicitud_id
-    from solicitudes s join propuestas p on p.solicitud_id = s.id
-   where p.id = c.propuesta_id;
+  -- una sola confirmación de fin por persona
+  if exists (select 1 from contratacion_evidencias e
+             where e.contratacion_id = c.id
+               and e.autor_id = auth.uid()
+               and e.tipo = 'fin') then
+    raise exception 'fin_ya_confirmado';
+  end if;
 
-  update contrataciones set estado = 'completado', updated_at = now() where id = c.id;
-  update solicitudes    set estado = 'cerrada'            where id = v_solicitud_id;
+  v_otro := case when auth.uid() = c.cliente_id then c.trabajador_id else c.cliente_id end;
 
-  insert into notificaciones (usuario_id, tipo, referencia_id)
-  values (c.trabajador_id, 'contratacion_completada', c.id);
+  -- registrar la evidencia de este participante
+  insert into contratacion_evidencias (contratacion_id, autor_id, tipo, comentario)
+  values (c.id, auth.uid(), 'fin', p_comentario)
+  returning id into v_evidencia;
+
+  if p_fotos is not null and array_length(p_fotos, 1) > 0 then
+    insert into contratacion_evidencia_fotos (evidencia_id, storage_path)
+    select v_evidencia, unnest(p_fotos);
+  end if;
+
+  -- ¿confirmaron los dos?
+  select count(distinct autor_id) into v_confirmaciones
+    from contratacion_evidencias
+   where contratacion_id = c.id and tipo = 'fin';
+
+  if v_confirmaciones >= 2 then
+    update contrataciones set estado = 'completado', updated_at = now() where id = c.id;
+
+    update solicitudes set estado = 'cerrada'
+     where id = (select s.id from solicitudes s
+                 join propuestas p on p.solicitud_id = s.id
+                where p.id = c.propuesta_id);
+
+    insert into notificaciones (usuario_id, tipo, referencia_id) values
+      (c.cliente_id,    'contratacion_completada', c.id),
+      (c.trabajador_id, 'contratacion_completada', c.id);
+
+    return 'completado';
+  else
+    update contrataciones set estado = 'pendiente_confirmacion', updated_at = now()
+     where id = c.id;
+
+    insert into notificaciones (usuario_id, tipo, referencia_id)
+    values (v_otro, 'contratacion_pendiente_confirmacion', c.id);
+
+    return 'pendiente_confirmacion';
+  end if;
 end $$;
 ```
 
-## `cancelar_contratacion`
+## `cancelar_contratacion` — unilateral (decisión 15)
 
-Cualquiera de los dos participantes. El motivo es obligatorio.
+Cualquiera de los dos participantes. Motivo obligatorio. Adjetiva fotos. Cancelable tanto
+en curso como con la otra parte esperando confirmación.
 
 ```sql
 create or replace function public.cancelar_contratacion(
-  p_contratacion_id uuid, p_motivo text)
+  p_contratacion_id uuid, p_motivo text, p_fotos text[])
 returns void language plpgsql security definer set search_path = public
 as $$
 declare
   c contrataciones;
-  v_solicitud_id uuid;
   v_otro uuid;
+  v_evidencia uuid;
 begin
   if p_motivo is null or btrim(p_motivo) = '' then
     raise exception 'motivo_obligatorio';
@@ -611,28 +956,79 @@ begin
   if auth.uid() not in (c.cliente_id, c.trabajador_id) then
     raise exception 'sin_permiso';
   end if;
-  if c.estado <> 'en_curso' then raise exception 'estado_invalido'; end if;
+  if c.estado not in ('en_curso', 'pendiente_confirmacion') then
+    raise exception 'estado_invalido';
+  end if;
 
-  v_otro := case when auth.uid() = c.cliente_id
-                 then c.trabajador_id else c.cliente_id end;
+  v_otro := case when auth.uid() = c.cliente_id then c.trabajador_id else c.cliente_id end;
 
-  select s.id into v_solicitud_id
-    from solicitudes s join propuestas p on p.solicitud_id = s.id
-   where p.id = c.propuesta_id;
+  -- registrar la evidencia de la cancelación
+  insert into contratacion_evidencias (contratacion_id, autor_id, tipo, comentario)
+  values (c.id, auth.uid(), 'cancelacion', p_motivo)
+  returning id into v_evidencia;
+
+  if p_fotos is not null and array_length(p_fotos, 1) > 0 then
+    insert into contratacion_evidencia_fotos (evidencia_id, storage_path)
+    select v_evidencia, unnest(p_fotos);
+  end if;
 
   update contrataciones
      set estado = 'cancelado', cancelado_por = auth.uid(),
          motivo_cancelacion = p_motivo, updated_at = now()
    where id = c.id;
 
-  update solicitudes set estado = 'cancelada' where id = v_solicitud_id;
+  update solicitudes set estado = 'cancelada'
+   where id = (select s.id from solicitudes s
+               join propuestas p on p.solicitud_id = s.id
+              where p.id = c.propuesta_id);
 
   insert into notificaciones (usuario_id, tipo, referencia_id)
   values (v_otro, 'contratacion_cancelada', c.id);
 end $$;
 ```
 
+## `agregar_respuesta` — evidencia de la contraparte (decisión 15)
+
+Permite que la parte que **no** canceló deje su versión con texto y fotos, que después ve
+el admin en el panel de reportes. No cambia el estado de la contratación.
+
+```sql
+create or replace function public.agregar_respuesta(
+  p_contratacion_id uuid, p_comentario text, p_fotos text[])
+returns void language plpgsql security definer set search_path = public
+as $$
+declare
+  c contrataciones;
+  v_evidencia uuid;
+begin
+  if p_comentario is null or btrim(p_comentario) = '' then
+    raise exception 'comentario_obligatorio';
+  end if;
+
+  select * into c from contrataciones where id = p_contratacion_id for update;
+  if not found then raise exception 'contratacion_no_encontrada'; end if;
+  if auth.uid() not in (c.cliente_id, c.trabajador_id) then
+    raise exception 'sin_permiso';
+  end if;
+  if c.estado not in ('en_curso', 'pendiente_confirmacion', 'cancelado') then
+    raise exception 'estado_invalido';
+  end if;
+
+  insert into contratacion_evidencias (contratacion_id, autor_id, tipo, comentario)
+  values (c.id, auth.uid(), 'respuesta', p_comentario)
+  returning id into v_evidencia;
+
+  if p_fotos is not null and array_length(p_fotos, 1) > 0 then
+    insert into contratacion_evidencia_fotos (evidencia_id, storage_path)
+    select v_evidencia, unnest(p_fotos);
+  end if;
+end $$;
+```
+
 ## `enviar_valoracion`
+
+Solo se habilita cuando la contratación está `completado`, es decir, con la doble
+validación (decisión 15). Sin las dos confirmaciones no hay reputación.
 
 ```sql
 create or replace function public.enviar_valoracion(
@@ -654,8 +1050,7 @@ begin
     raise exception 'sin_permiso';
   end if;
 
-  v_dest := case when auth.uid() = c.cliente_id
-                 then c.trabajador_id else c.cliente_id end;
+  v_dest := case when auth.uid() = c.cliente_id then c.trabajador_id else c.cliente_id end;
 
   insert into valoraciones
     (contratacion_id, autor_id, destinatario_id, puntuacion, comentario)
@@ -677,10 +1072,34 @@ begin
 end $$;
 ```
 
-## `admin_bloquear_usuario`
+## Administración
 
-Bloquear en cascada: sus solicitudes abiertas se cancelan y sus propuestas enviadas se
-retiran, para no dejar trabajo huérfano en el feed.
+```sql
+create or replace function public.admin_asignar_rol(p_usuario_id uuid, p_rol rol_usuario)
+returns void language plpgsql security definer set search_path = public
+as $$
+begin
+  if not es_admin() then raise exception 'sin_permiso'; end if;
+  update perfiles set rol = p_rol where id = p_usuario_id;
+end $$;
+
+create or replace function public.admin_listar_usuarios()
+returns table (
+  id uuid, nombre text, apellido text, email text,
+  rol rol_usuario, activo boolean, created_at timestamptz)
+language sql security definer stable set search_path = public
+as $$
+  select id, nombre, apellido, email, rol, activo, created_at
+  from perfiles
+  where es_admin()
+  order by created_at desc;
+$$;
+```
+
+### Bloqueo (decisión 10)
+
+La cascada se hace en base de datos; el ban de sesión se hace en Auth, que requiere
+service role.
 
 ```sql
 create or replace function public.admin_bloquear_usuario(p_usuario_id uuid)
@@ -706,17 +1125,56 @@ revoke all on function public.admin_bloquear_usuario(uuid) from authenticated, a
 grant execute on function public.admin_bloquear_usuario(uuid) to authenticated;
 ```
 
-## `admin_asignar_rol`
+**Edge Function `admin-bloquear-usuario`:** como el ban en Auth necesita la service role
+key (que no puede vivir en el front), se implementa una Edge Function que:
+1. verifica que quien llama es un admin,
+2. llama a la RPC `admin_bloquear_usuario` (cascada),
+3. llama a `auth.admin.updateUserById(id, { ban_duration: '876000h' })`.
 
-Mecanismo confiable para crear administradores, ya que el registro público no lo permite.
+El desbloqueo es la misma función con `ban_duration: 'none'` y `activo = true`.
+
+### Métricas del dashboard (decisión 14)
 
 ```sql
-create or replace function public.admin_asignar_rol(p_usuario_id uuid, p_rol rol_usuario)
-returns void language plpgsql security definer set search_path = public
+create or replace function public.admin_metricas()
+returns jsonb language plpgsql security definer set search_path = public
 as $$
+declare v_result jsonb;
 begin
   if not es_admin() then raise exception 'sin_permiso'; end if;
-  update perfiles set rol = p_rol where id = p_usuario_id;
+
+  select jsonb_build_object(
+    'usuarios_por_rol', (
+      select jsonb_object_agg(rol, n) from (
+        select rol, count(*) n from perfiles group by rol) t),
+    'solicitudes_por_estado', (
+      select jsonb_object_agg(estado, n) from (
+        select estado, count(*) n from solicitudes group by estado) t),
+    'contrataciones_por_estado', (
+      select jsonb_object_agg(estado, n) from (
+        select estado, count(*) n from contrataciones group by estado) t),
+    'valoraciones_total', (select count(*) from valoraciones),
+    'puntuacion_promedio', (
+      select coalesce(round(avg(puntuacion)::numeric, 2), 0) from valoraciones),
+    'ultimos_30_dias', jsonb_build_object(
+      'registros',      (select count(*) from perfiles
+                         where created_at > now() - interval '30 days'),
+      'solicitudes',    (select count(*) from solicitudes
+                         where created_at > now() - interval '30 days'),
+      'completadas',    (select count(*) from contrataciones
+                         where estado = 'completado'
+                           and updated_at > now() - interval '30 days')),
+    'top_oficios', (
+      select jsonb_agg(jsonb_build_object('oficio', nombre, 'solicitudes', n)) from (
+        select o.nombre, count(s.id) n
+        from oficios o join solicitudes s on s.oficio_id = o.id
+        group by o.nombre order by n desc limit 5) t),
+    'cola_pendientes', jsonb_build_object(
+      'oficios',  (select count(*) from oficios where estado = 'pendiente'),
+      'reportes', (select count(*) from reportes where estado = 'pendiente'))
+  ) into v_result;
+
+  return v_result;
 end $$;
 ```
 
@@ -726,6 +1184,11 @@ El front debe traducir los `raise exception` a mensajes en español.
 Convención: `codigo_error` en minúscula y snake_case, mapeada en un único lugar
 (`lib/errores.js`), para no dispersar strings por la UI.
 
+Códigos de oficios: `nombre_vacio`, `oficio_no_permitido`, `oficio_no_encontrado`,
+`mismo_oficio`.
+Códigos de contratación: `contratacion_no_encontrada`, `estado_invalido`,
+`fin_ya_confirmado`, `motivo_obligatorio`, `comentario_obligatorio`, `sin_permiso`.
+
 ---
 
 # REGLAS DE NEGOCIO
@@ -734,9 +1197,12 @@ Convención: `codigo_error` en minúscula y snake_case, mapeada en un único lug
 
 ```
 SOLICITUD
-   abierta ─── aceptar propuesta ───▶ asignada ─── completar ───▶ cerrada
-     │                                                        ▲
-     └──────────────────── cancelar ─────────────────────────┴─▶ cancelada
+   abierta ── aceptar propuesta ──▶ asignada ── doble confirmación de fin ──▶ cerrada
+     │                                                                         ▲
+     └──────────────── cancelar (cliente) ────────────────┐                    │
+                                                          ▼                    │
+                                                      cancelada ───────────────┘
+                                                       (o cancelación de la contratación)
 
 PROPUESTA
    enviada ─┬─ el cliente la acepta ─────▶ aceptada   (crea contratación)
@@ -744,8 +1210,11 @@ PROPUESTA
             └─ el trabajador se arrepintió▶ retirada
 
 CONTRATACIÓN
-   en_curso ─┬─ completar (solo cliente) ▶ completado  (habilita valoraciones)
-             └─ cancelar (cualquiera) ───▶ cancelado
+   en_curso ── confirmar_fin (uno de los dos) ──▶ pendiente_confirmacion
+   pendiente_confirmacion ── confirmar_fin (el otro) ──▶ completado
+                                                              (habilita valoraciones)
+
+   en_curso | pendiente_confirmacion ── cancelar (uno solo) ──▶ cancelado
 
 VALORACIÓN
    creada ──▶ inmutable. Sin edición ni borrado por el autor.
@@ -755,12 +1224,45 @@ VALORACIÓN
 ## Solicitudes
 
 - El feed muestra todas las solicitudes `abierta` a cualquier trabajador autenticado,
-  incluyendo foto y presupuesto máximo.
+  incluyendo foto y presupuesto máximo (si el cliente lo cargó).
+- **Publicación con previsualización (decisión 16):** el cliente completa el formulario,
+  pulsa *Previsualizar*, ve la solicitud como la verán los trabajadores y puede modificar
+  **cualquier campo, incluido el oficio**, antes de *Confirmar publicación*. Recién en ese
+  momento se escribe en la base: la previsualización vive en el estado del formulario, no
+  requiere estado `borrador`.
+- **Una vez publicada no se edita** (decisión 16). Si el cliente se equivocó, cancela y
+  publica otra.
 - Un trabajador solo puede enviar **una** propuesta por solicitud (unique index).
 - No se puede proponer sobre una solicitud `cerrada`, `asignada` o `cancelada`.
 - El cliente puede cancelar su solicitud mientras esté `abierta`.
-- El `presupuesto_max` es orientativo: el trabajador puede proponer por encima
-  (**decisión 2**), y la UI debe advertirlo visualmente al comparar propuestas.
+- El `presupuesto_max` es **opcional** (decisión 11). Cuando existe, es orientativo: el
+  trabajador puede proponer por encima (decisión 2) y la UI debe advertirlo visualmente al
+  comparar propuestas.
+
+## Oficios
+
+- El catálogo base viene por seed, `activo`.
+- Un trabajador puede asociarse a oficios activos y **crear nuevos** (decisión 12). Los
+  nuevos quedan `pendiente` y requieren aprobación del admin.
+- **Sin duplicados:** la columna `nombre_normalizado` (minúsculas + sin acentos + espacios
+  colapsados) más su índice único impiden cargar dos veces el mismo oficio con distinto
+  formato. `crear_oficio` devuelve el existente en vez de duplicarlo.
+- **Typos:** la UI muestra sugerencias difusas (`buscar_oficios`) con "¿Quisiste decir...?"
+  antes de permitir crear. Los que se cuelen se corrigen con la fusión.
+- **Fusión (admin):** reasigna trabajadores y solicitudes del duplicado al destino y deja
+  el duplicado `inactivo`.
+- **Pendiente y publicación (decisión 13):** un oficio `pendiente` cuenta para que su
+  creador pueda postular, pero **no se muestra público** ni aparece para que los clientes
+  lo elijan hasta ser aprobado.
+
+## Contacto
+
+- El teléfono vive en `perfil_contacto` (decisión 8). Se pide en el registro para todos
+  los roles.
+- Solo lo ven: el dueño, el admin y **la contraparte con una contratación `en_curso`,
+  `pendiente_confirmacion` o `completado`**. Al cancelarse la contratación, deja de verse.
+- La coordinación de fecha, hora y dirección ocurre **por fuera de la plataforma**, porque
+  el chat está fuera de alcance. El teléfono es el dato que lo hace posible.
 
 ## Propuestas
 
@@ -770,35 +1272,46 @@ VALORACIÓN
 - Al aceptar una, las demás pasan automáticamente a `rechazada` y sus autores reciben
   notificación (**decisión 1**).
 
-## Contrataciones
+## Contrataciones (decisión 15)
 
 - Solo se crean desde `aceptar_propuesta`. Nunca por un `INSERT` directo del cliente.
-- Solo el **cliente** marca `completado`.
-- Cualquiera de los dos puede cancelar, con motivo obligatorio; queda registrado quién
-  canceló (`cancelado_por`).
-- Al completarse, se habilitan las valoraciones de ambos participantes.
+- **El fin requiere doble validación:** la primera confirmación deja la contratación en
+  `pendiente_confirmacion`; recién la segunda la pasa a `completado`. Cada parte confirma
+  una sola vez y puede adjuntar texto y fotos.
+- La contraparte **ve la evidencia del primero** antes de confirmar: es lo que da sentido a
+  la doble validación.
+- **Cancelar es unilateral**, tanto en `en_curso` como en `pendiente_confirmacion`, con
+  motivo obligatorio y fotos opcionales. Queda registrado quién canceló.
+- Tras una cancelación, la contraparte puede agregar su versión (`agregar_respuesta`) con
+  texto y fotos; queda como insumo para el admin.
+- Al `completado`, se habilitan las valoraciones de ambos participantes. Mientras esté
+  `en_curso` o `pendiente_confirmacion`, no.
 
 ## Valoraciones
 
-- ⭐ de 1 a 5. Comentario opcional. Fotos de evidencia opcionales.
+- ⭐ de 1 a 5. Comentario opcional. Hasta 3 fotos de evidencia.
 - Una por participante por contratación (unique index).
 - Inmutables: ni editar ni borrar. Moderación solo del admin.
 - Visibles públicamente en el perfil del destinatario.
 
 ## Perfil trabajador
 
-- **Requisito para enviar propuestas** (decisión 5): al menos 1 oficio asignado,
-  `descripcion` y `ubicacion` completas.
+- **Requisito para enviar propuestas** (decisiones 5 y 13): al menos 1 oficio (activo o
+  propio pendiente), `descripcion` y `ubicacion` completas.
 - **Sin antigüedad mínima**: un trabajador recién registrado puede postular.
   Se muestra con el badge "Nuevo" y no se lo penaliza en los ordenamientos.
 
 ## Administración
 
-- Bloqueo de usuario: `activo = false`, propagando a solicitudes `abierta` → `cancelada`
-  y propuestas `enviada` → `retirada`.
-- El bloqueo se verifica en el middleware del front tras el login (no en RLS, más simple).
+- **Bloqueo real (decisión 10):** `activo = false` + cascada (solicitudes `abierta` →
+  `cancelada`, propuestas `enviada` → `retirada`) + **ban en Supabase Auth** vía Edge
+  Function. El chequeo de `activo` en el front complementa, pero el corte real lo hace el
+  ban, que también frena llamadas directas a la API con sesión válida.
 - `admin_asignar_rol` es el único camino para crear administradores.
-- Reportes: el admin los lista por estado y puede resolverlos o descartarlos.
+- **Oficios:** el admin aprueba o rechaza los pendientes y fusiona duplicados.
+- **Reportes:** el admin los lista por estado y puede resolverlos o descartarlos.
+- **Métricas:** totales por rol y estado, tendencia de 30 días, top de oficios y cola de
+  pendientes (oficios por aprobar, reportes abiertos).
 
 ## Notificaciones
 
@@ -831,7 +1344,7 @@ src/
 ├─ lib/
 │  ├─ supabase.js              # cliente + helper de errores
 │  ├─ errores.js               # mapeo codigo_error → mensaje en español
-│  └─ format.js                # moneda, fechas
+│  └─ format.js                # moneda ARS, fechas
 ├─ context/
 │  └─ AuthContext.jsx          # sesión + perfil + rol + activo
 ├─ hooks/
@@ -839,21 +1352,22 @@ src/
 │  ├─ useSolicitudes.js
 │  ├─ usePropuestas.js
 │  ├─ useContrataciones.js
+│  ├─ useOficios.js
 │  ├─ useNotificaciones.js
 │  └─ useRealtime.js           # wrapper de supabase.channel()
 ├─ components/
-│  ├─ ui/                      # Button, Input, Select, Modal, Card, Badge,
-│  │                           # Rating, Spinner, Toast, EmptyState, FileDrop
+│  ├─ ui/                      # Button, Input, Select, Combobox (oficios), Modal,
+│  │                           # Card, Badge, Rating, Spinner, Toast, EmptyState, FileDrop
 │  └─ layout/                  # Navbar, Sidebar, PageHeader, RoleGuard
 └─ features/
    ├─ auth/                    # Login, Registro, SeleccionRol, OnboardingTrabajador
-   ├─ cliente/                 # Dashboard, MisSolicitudes, NuevaSolicitud,
+   ├─ cliente/                 # Dashboard, MisSolicitudes, NuevaSolicitud (con preview),
    │                           # DetalleSolicitud, CompararPropuestas,
-   │                           # Contrataciones, Valorar
+   │                           # Contrataciones, BitacoraContratacion, Valorar
    ├─ trabajador/              # Dashboard, ExplorarSolicitudes, DetalleSolicitud,
    │                           # EnviarPropuesta, MisPropuestas, MiPerfil,
-   │                           # Portfolio, Contrataciones, Valorar
-   ├─ admin/                   # DashboardMetricas, Usuarios, Reportes
+   │                           # Portfolio, Contrataciones, BitacoraContratacion, Valorar
+   ├─ admin/                   # DashboardMetricas, Usuarios, Reportes, Oficios
    └─ notificaciones/          # Centro de notificaciones
 ```
 
@@ -868,15 +1382,19 @@ src/
 | `/cliente/solicitudes/:id` | cliente | solicitudes-y-propuesta.png |
 | `/cliente/solicitudes/:id/propuestas` | cliente | comparar-propuestas.png |
 | `/cliente/contrataciones` | cliente | — |
+| `/cliente/contrataciones/:id` | cliente | — (bitácora de evidencias) |
 | `/cliente/valorar/:contratacionId` | cliente | valoracion-y-reputacion.png |
 | `/trabajador` | trabajador | — (a diseñar) |
 | `/trabajador/explorar` | trabajador | — |
 | `/trabajador/propuestas` | trabajador | — |
 | `/trabajador/perfil` | trabajador | perfil-del-trabajador.png |
 | `/trabajador/portfolio` | trabajador | perfil-del-trabajador.png |
+| `/trabajador/contrataciones` | trabajador | — |
+| `/trabajador/contrataciones/:id` | trabajador | — (bitácora de evidencias) |
 | `/trabajador/valorar/:contratacionId` | trabajador | valoracion-y-reputacion.png |
 | `/admin` | admin | Panel de administración.png |
 | `/admin/usuarios` | admin | — |
+| `/admin/oficios` | admin | — (cola de aprobación) |
 | `/admin/reportes` | admin | — |
 
 Los 7 mockups existentes quedan cubiertos. Faltan diseñar los dashboards de cliente y
@@ -886,8 +1404,7 @@ trabajador.
 
 `RoleGuard` envuelve cada grupo de rutas y resuelve tres casos: sin sesión → `/login`;
 rol incorrecto → página de "acceso no autorizado"; perfil con `activo = false` → pantalla
-de cuenta bloqueada. El chequeo de `activo` se hace en un único punto tras el login, no
-disperso por la app.
+de cuenta bloqueada. El chequeo de `activo` se hace en un único punto tras el login.
 
 ## Realtime (alcance acotado)
 
@@ -905,40 +1422,58 @@ y las mutaciones invalidan las claves afectadas:
 
 | Mutación | Claves a invalidar |
 |---|---|
+| `crear_oficio` | `['oficios']`, `['mi-perfil']` |
+| `admin_aprobar_oficio` / `admin_fusionar_oficios` | `['oficios']`, `['admin-metricas']` |
 | `enviar_propuesta` | `['solicitudes','abiertas']`, `['mis-propuestas']` |
 | `aceptar_propuesta` | `['propuestas', id]`, `['solicitud', id]`, `['contrataciones']` |
-| `completar_contratacion` | `['contrataciones']`, `['valoraciones-pendientes']` |
+| `confirmar_fin` | `['contrataciones']`, `['contratacion', id]`, `['valoraciones-pendientes']` |
+| `cancelar_contratacion` | `['contrataciones']`, `['contratacion', id]` |
+| `agregar_respuesta` | `['contratacion', id]` |
 | `enviar_valoracion` | `['perfil', id]`, `['contrataciones']` |
 
 `AuthContext` maneja únicamente sesión, perfil y rol.
+
+## Moneda
+
+Los montos se formatean en el front con
+`Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' })`, que produce
+`$ 1.234.567`. La base guarda `numeric(12,2)`.
 
 ---
 
 # ORDEN DE IMPLEMENTACIÓN SUGERIDO
 
 1. **Andamiaje**: Vite + React + Tailwind + rutas + `AuthContext` + layout base.
-2. **Migración SQL**: enums, tablas, índices, constraints, vista.
-3. **Seguridad**: RLS + privilegios de columna + políticas de Storage.
-4. **RPCs y triggers**: alta de usuario, `enviar_propuesta`, `aceptar_propuesta`,
-   `completar_contratacion`, `cancelar_contratacion`, `enviar_valoracion`, admin.
-5. **Seed**: catálogo de oficios (plomería, electricidad, herrería, albañilería,
+2. **Migración SQL**: extensiones, enums, tablas, índices, constraints, vista.
+3. **Seguridad**: RLS + privilegios por columna + políticas de Storage.
+4. **RPCs y triggers base**: alta de usuario (perfil + contacto), oficios
+   (`buscar_oficios`, `crear_oficio`, `admin_aprobar_oficio`, `admin_fusionar_oficios`).
+5. **RPCs del flujo**: `enviar_propuesta`, `aceptar_propuesta`, `confirmar_fin`,
+   `cancelar_contratacion`, `agregar_respuesta`, `enviar_valoracion`.
+6. **Seed**: catálogo de oficios (plomería, electricidad, herrería, albañilería,
    carpintería, pintura, gas, jardinería, limpieza) + un usuario admin.
-6. **Flujo cliente**: registro, publicar solicitud, recibir propuestas, comparar, aceptar.
-7. **Flujo trabajador**: onboarding, perfil, portfolio, explorar, enviar propuesta.
-8. **Cierre**: completar/cancelar contratación, valoraciones, reputación en perfiles.
-9. **Notificaciones y Realtime**.
-10. **Panel admin**: métricas, usuarios, reportes.
-11. **Despliegue** y verificación de límites del plan gratuito.
+7. **Flujo cliente**: registro, publicar solicitud con preview, recibir propuestas,
+   comparar, aceptar.
+8. **Flujo trabajador**: onboarding, perfil, portfolio, oficios (crear/ asociar), explorar,
+   enviar propuesta.
+9. **Cierre**: doble confirmación de fin, cancelación, respuesta, bitácora de evidencias,
+   valoraciones, reputación en perfiles.
+10. **Notificaciones y Realtime**.
+11. **Panel admin**: métricas, usuarios (ban), oficios (aprobación/fusión), reportes.
+12. **Edge Function** `admin-bloquear-usuario`.
+13. **Despliegue** y verificación de límites del plan gratuito.
 
 ---
 
 # PENDIENTES
 
-- **Diseño**: falta mockupear los dashboards de cliente y trabajador.
+- **Diseño**: falta mockupear los dashboards de cliente y trabajador y la bitácora de
+  evidencias de la contratación.
 - **Hosting**: definir entre Vercel / Netlify y verificar límites del plan gratuito.
-- **Formato de presupuesto**: ¿se muestra en pesos? Falta definir moneda y formato.
-- **Límite de fotos**: cuántas fotos por solicitud, propuesta y valoración.
-- **Edición de solicitudes**: ¿el cliente puede editar una solicitud `abierta`? (Hoy solo
-  cancelarla.)
 - **PWA**: no está en el MVP. Podría agregarse después para que se instale en el celular,
   sin cambiar el stack.
+- **Limpieza de Storage**: los archivos se suben antes de llamar a la RPC, así que puede
+  quedar algún huérfano sin referencia. Pendiente de una purga periódica; no bloquea el MVP.
+- **Vencimiento de `pendiente_confirmacion`**: hoy no expira (siempre queda la salida de
+  cancelar unilateralmente). Opcional a futuro: cancelación automática tras N días sin
+  respuesta.
