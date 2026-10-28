@@ -13,10 +13,22 @@ un sistema de reputación basado en trabajos realizados y valoraciones.
   del trabajador (oficios, avatar, portfolio) y perfil del cliente (zona y descripción).
 - **Solicitudes y propuestas en Supabase**: el cliente publica solicitudes con fotos, el
   trabajador explora el feed, se postula y el cliente ve las propuestas recibidas.
+- **Contrataciones**: el cliente acepta una propuesta (se rechazan las demás), el servicio
+  se cierra con **doble confirmación** de fin, se puede cancelar mientras está en curso y,
+  ante un desacuerdo, se puede **reportar el contrato** (reporte + descargo, una vez cada
+  parte) como antecedente público.
+- **Perfiles públicos y advertencias**: cada usuario tiene un perfil público con su
+  información, su **reputación** (promedio + distribución) y su **historial**: valoraciones
+  recibidas, contratos cancelados y contratos reportados (con fotos). Un triángulo de
+  advertencia ⚠ señala una valoración baja o un contrato reportado, y un "!" rojo cuando
+  hay 2+ reportes. En las propuestas, el cliente ve además miniaturas de los trabajos
+  previos del postulante.
+- **Valoraciones y reputación**: valoración mutua (1-5 + comentario + fotos) al completar
+  una contratación; promedio y distribución visibles en perfiles y listados.
 - **Panel de administración (etapa 1)**: métricas generales y moderación de oficios
   (aprobar, rechazar y fusionar duplicados).
-- **Próxima etapa**: aceptar propuestas, contrataciones, valoraciones, gestión de usuarios
-  y reportes.
+- **Próxima etapa**: valoraciones y reputación, notificaciones, gestión de usuarios y
+  reportes, y despliegue.
 
 ## Configuración
 
@@ -82,11 +94,14 @@ src/
 │  ├─ trabajador/ # Dashboard, Explorar, DetalleSolicitud, MisPropuestas, TarjetaPropuesta,
 │  │              # Perfil, PerfilTrabajador, OficioSelector, AvatarUploader, Portfolio,
 │  │              # TarjetaOferta
+│  ├─ contrataciones/ # ListaContrataciones, DetalleContratacion, Bitacora
+│  ├─ perfiles/      # PublicProfile (perfil público con reputación y reportes)
 │  └─ admin/      # Dashboard (métricas), Oficios (moderación)
-├─ hooks/         # useSolicitudes, useOficios
+├─ hooks/         # useSolicitudes, useOficios, useReputacion
 └─ lib/
-   ├─ data/       # repositorios Supabase: auth, oficios, perfil (cliente/trabajador),
-   │              #   solicitudes, propuestas, portfolio, admin + almacenamiento (Storage)
+   ├─ data/       # repositorios Supabase: auth, oficios, perfiles, solicitudes,
+   │              #   propuestas, contrataciones, valoraciones, portfolio, admin
+   │              #   + almacenamiento (Storage)
    ├─ supabase.js # cliente de Supabase
    ├─ errores.js  # mapeo de códigos de error a mensajes
    ├─ format.js   # moneda ARS y fechas

@@ -49,6 +49,7 @@ const ICONOS = {
   explorar: 'M11 19a8 8 0 1 0 0-16 8 8 0 0 0 0 16ZM21 21l-4.3-4.3',
   propuestas: 'M22 2 11 13M22 2l-7 20-4-9-9-4z',
   oficios: 'M14.7 6.3a4 4 0 0 0 5 5l-9.4 9.4a2.1 2.1 0 0 1-3-3zM14.7 6.3 18 3l3 3-3.3 3.3',
+  contrataciones: 'M9 11l3 3L22 4M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11',
 }
 
 const NAV_POR_ROL = {
@@ -56,13 +57,14 @@ const NAV_POR_ROL = {
     mobile: [
       { a: '/cliente', icono: 'inicio', texto: 'Inicio' },
       { a: '/cliente/solicitudes', icono: 'solicitudes', texto: 'Solicitudes' },
-      { a: '/cliente/solicitudes/nueva', icono: 'publicar', texto: 'Publicar' },
+      { a: '/cliente/contrataciones', icono: 'contrataciones', texto: 'Contrataciones' },
       { a: '/perfil', icono: 'perfil', texto: 'Mi cuenta' },
     ],
     desktop: [
       { a: '/cliente', icono: 'inicio', texto: 'Inicio' },
       { a: '/cliente/solicitudes', icono: 'solicitudes', texto: 'Solicitudes' },
       { a: '/cliente/solicitudes/nueva', icono: 'publicar', texto: 'Publicar' },
+      { a: '/cliente/contrataciones', icono: 'contrataciones', texto: 'Contrataciones' },
       { a: '/perfil', icono: 'perfil', texto: 'Mi cuenta' },
     ],
   },
@@ -71,12 +73,14 @@ const NAV_POR_ROL = {
       { a: '/trabajador', icono: 'inicio', texto: 'Inicio' },
       { a: '/trabajador/explorar', icono: 'explorar', texto: 'Explorar' },
       { a: '/trabajador/propuestas', icono: 'propuestas', texto: 'Propuestas' },
+      { a: '/trabajador/contrataciones', icono: 'contrataciones', texto: 'Contrataciones' },
       { a: '/trabajador/perfil', icono: 'perfil', texto: 'Mi perfil' },
     ],
     desktop: [
       { a: '/trabajador', icono: 'inicio', texto: 'Inicio' },
       { a: '/trabajador/explorar', icono: 'explorar', texto: 'Explorar' },
       { a: '/trabajador/propuestas', icono: 'propuestas', texto: 'Propuestas' },
+      { a: '/trabajador/contrataciones', icono: 'contrataciones', texto: 'Contrataciones' },
       { a: '/trabajador/perfil', icono: 'perfil', texto: 'Mi perfil' },
       { a: '/trabajador/portfolio', icono: 'portafolio', texto: 'Portfolio' },
       { a: '/perfil', icono: 'solicitudes', texto: 'Mi cuenta' },

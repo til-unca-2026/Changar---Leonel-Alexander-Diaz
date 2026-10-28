@@ -34,6 +34,24 @@ export async function subirFotoSolicitud(clienteId, solicitudId, file) {
   return path
 }
 
+export async function subirEvidencia(usuarioId, contratacionId, file) {
+  const path = `${usuarioId}/${contratacionId}/${crypto.randomUUID()}.${extension(file.name)}`
+  const { error } = await supabase.storage
+    .from('contratacion-evidencias')
+    .upload(path, file, { contentType: file.type })
+  if (error) throw error
+  return path
+}
+
+export async function subirFotoValoracion(usuarioId, file) {
+  const path = `${usuarioId}/valoraciones/${crypto.randomUUID()}.${extension(file.name)}`
+  const { error } = await supabase.storage
+    .from('valoracion-fotos')
+    .upload(path, file, { contentType: file.type })
+  if (error) throw error
+  return path
+}
+
 export async function eliminarArchivo(bucket, path) {
   const { error } = await supabase.storage.from(bucket).remove([path])
   if (error) throw error

@@ -18,6 +18,12 @@ const MENSAJES = {
   no_podes_postularte_a_tu_solicitud: 'No podés postularte a tu propia solicitud.',
   descripcion_vacia: 'Escribí una descripción para tu propuesta.',
   presupuesto_invalido: 'Ingresá un presupuesto válido.',
+  reporte_ya_enviado: 'Este contrato ya fue reportado.',
+  descargo_ya_enviado: 'El descargo ya fue presentado.',
+  reportante_sin_descargo: 'Ya te explayaste en el reporte; no corresponde un descargo.',
+  puntuacion_invalida: 'La puntuación debe estar entre 1 y 5 estrellas.',
+  contratacion_no_completada: 'Solo se puede valorar una contratación completada.',
+  valoracion_duplicada: 'Ya valoraste esta contratación.',
 }
 
 const MENSAJES_SUPABASE = {
@@ -51,6 +57,12 @@ export function mensajeError(error) {
   if (/no_podes_postularte/i.test(codigo)) return MENSAJES.no_podes_postularte_a_tu_solicitud
   if (/descripcion_vacia/i.test(codigo)) return MENSAJES.descripcion_vacia
   if (/presupuesto_invalido/i.test(codigo)) return MENSAJES.presupuesto_invalido
+  if (/reporte_ya_enviado/i.test(codigo)) return MENSAJES.reporte_ya_enviado
+  if (/descargo_ya_enviado/i.test(codigo)) return MENSAJES.descargo_ya_enviado
+  if (/reportante_sin_descargo/i.test(codigo)) return MENSAJES.reportante_sin_descargo
+  if (/puntuacion_invalida/i.test(codigo)) return MENSAJES.puntuacion_invalida
+  if (/contratacion_no_completada/i.test(codigo)) return MENSAJES.contratacion_no_completada
+  if (/valoracion_duplicada/i.test(codigo)) return MENSAJES.valoracion_duplicada
 
   if (/propuestas_solicitud_id_trabajador_id_key/i.test(codigo)) {
     return 'Ya enviaste una propuesta a esta solicitud.'

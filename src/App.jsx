@@ -6,10 +6,13 @@ import Login from '@/features/auth/Login.jsx'
 import Registro from '@/features/auth/Registro.jsx'
 import OnboardingTrabajador from '@/features/auth/OnboardingTrabajador.jsx'
 import Perfil from '@/features/auth/Perfil.jsx'
+import PublicProfile from '@/features/perfiles/PublicProfile.jsx'
 import ClienteDashboard from '@/features/cliente/Dashboard.jsx'
 import MisSolicitudes from '@/features/cliente/MisSolicitudes.jsx'
 import NuevaSolicitud from '@/features/cliente/NuevaSolicitud.jsx'
 import ClienteDetalleSolicitud from '@/features/cliente/DetalleSolicitud.jsx'
+import ListaContrataciones from '@/features/contrataciones/ListaContrataciones.jsx'
+import DetalleContratacion from '@/features/contrataciones/DetalleContratacion.jsx'
 import TrabajadorDashboard from '@/features/trabajador/Dashboard.jsx'
 import Explorar from '@/features/trabajador/Explorar.jsx'
 import TrabajadorDetalleSolicitud from '@/features/trabajador/DetalleSolicitud.jsx'
@@ -51,6 +54,8 @@ export default function App() {
           <Route path="/cliente/solicitudes" element={<MisSolicitudes />} />
           <Route path="/cliente/solicitudes/nueva" element={<NuevaSolicitud />} />
           <Route path="/cliente/solicitudes/:id" element={<ClienteDetalleSolicitud />} />
+          <Route path="/cliente/contrataciones" element={<ListaContrataciones />} />
+          <Route path="/cliente/contrataciones/:id" element={<DetalleContratacion />} />
         </Route>
       </Route>
 
@@ -61,6 +66,8 @@ export default function App() {
           <Route path="/trabajador/explorar" element={<Explorar />} />
           <Route path="/trabajador/solicitudes/:id" element={<TrabajadorDetalleSolicitud />} />
           <Route path="/trabajador/propuestas" element={<MisPropuestas />} />
+          <Route path="/trabajador/contrataciones" element={<ListaContrataciones />} />
+          <Route path="/trabajador/contrataciones/:id" element={<DetalleContratacion />} />
           <Route path="/trabajador/perfil" element={<PerfilTrabajadorPage />} />
           <Route path="/trabajador/portfolio" element={<Portfolio />} />
         </Route>
@@ -78,6 +85,7 @@ export default function App() {
       <Route element={<RoleGuard />}>
         <Route element={<AppLayout />}>
           <Route path="/perfil" element={<Perfil />} />
+          <Route path="/perfiles/:id" element={<PublicProfile />} />
         </Route>
       </Route>
 

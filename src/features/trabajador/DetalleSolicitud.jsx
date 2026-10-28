@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { Link, Navigate, useNavigate, useParams } from 'react-router-dom'
 import { useAuth } from '@/context/AuthContext.jsx'
 import { useToast } from '@/components/ui/Toast.jsx'
 import * as solicitudesRepo from '@/lib/data/solicitudes.repo.js'
 import * as propuestasRepo from '@/lib/data/propuestas.repo.js'
+import * as contratacionesRepo from '@/lib/data/contrataciones.repo.js'
 import * as perfilRepo from '@/lib/data/perfilTrabajador.repo.js'
 import { calcularCompletitud } from '@/lib/perfil.js'
 import { mensajeError } from '@/lib/errores.js'
@@ -24,6 +25,7 @@ export default function DetalleSolicitud() {
   const [solicitud, setSolicitud] = useState(null)
   const [perfil, setPerfil] = useState(null)
   const [miPropuesta, setMiPropuesta] = useState(null)
+  const [contratacion, setContratacion] = useState(null)
   const [cargando, setCargando] = useState(true)
   const [error, setError] = useState('')
   const [enviando, setEnviando] = useState(false)
@@ -37,11 +39,15 @@ export default function DetalleSolicitud() {
       perfilRepo.obtener(usuario.id),
       propuestasRepo.miPropuesta(id, usuario.id),
     ])
-      .then(([sol, p, prop]) => {
+      .then(async ([sol, p, prop]) => {
         if (!activo) return
         setSolicitud(sol)
         setPerfil(p)
         setMiPropuesta(prop)
+        if (prop?.estado === 'aceptada') {
+          const c = await contratacionesRepo.obtenerPorPropuesta(prop.id)
+          if (activo) setContratacion(c)
+        }
       })
       .finally(() => activo && setCargando(false))
     return () => {
@@ -86,6 +92,10 @@ export default function DetalleSolicitud() {
         <Spinner className="h-8 w-8" />
       </div>
     )
+  }
+
+  if (contratacion) {
+    return <Navigate to={`/trabajador/contrataciones/${contratacion.id}`} replace />
   }
 
   if (!solicitud) {
@@ -155,6 +165,14 @@ export default function DetalleSolicitud() {
           <p className="mt-1 text-xs text-muted">
             Enviada {fechaRelativa(miPropuesta.created_at).toLowerCase()}
           </p>
+          {contratacion && (
+            <Link
+              to={`/trabajador/contrataciones/${contratacion.id}`}
+              className="mt-3 block sm:inline-block"
+            >
+              <Button className="w-full sm:w-auto">Ver contratación</Button>
+            </Link>
+          )}
         </Card>
       ) : solicitud.estado !== 'abierta' ? (
         <Card className="text-center">
