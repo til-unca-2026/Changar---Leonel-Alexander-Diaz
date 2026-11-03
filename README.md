@@ -29,8 +29,10 @@ un sistema de reputación basado en trabajos realizados y valoraciones.
   (aprobar, rechazar y fusionar duplicados), gestión de usuarios (marcas de advertencia
   privadas, ban temporal/permanente, cambio de rol) y reportes de perfiles y contratos
   reportados (con resolución a favor de una parte).
-- **Próxima etapa**: valoraciones y reputación, notificaciones, gestión de usuarios y
-  reportes, y despliegue.
+- **Notificaciones in-app**: avisos por propuestas, contrataciones, valoraciones, oficios y
+  reportes, con centro de notificaciones y badge en el header.
+- **Próxima etapa**: menores (retirar propuesta, cancelar solicitud), Realtime (opcional) y
+  despliegue.
 
 ## Configuración
 
