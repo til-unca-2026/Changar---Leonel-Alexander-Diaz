@@ -42,6 +42,17 @@ export default function RoleGuard({ roles }) {
     )
   }
 
+  if (usuario.baneadoHasta && new Date(usuario.baneadoHasta) > new Date()) {
+    return (
+      <Pantalla
+        titulo="Cuenta suspendida"
+        texto={`Tu cuenta está suspendida temporalmente hasta el ${new Date(
+          usuario.baneadoHasta,
+        ).toLocaleDateString('es-AR')}.`}
+      />
+    )
+  }
+
   if (roles && !roles.includes(usuario.rol)) {
     return (
       <Pantalla

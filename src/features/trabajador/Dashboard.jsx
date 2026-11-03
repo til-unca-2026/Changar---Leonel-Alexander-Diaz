@@ -3,16 +3,21 @@ import { Link } from 'react-router-dom'
 import { useAuth } from '@/context/AuthContext.jsx'
 import * as perfilRepo from '@/lib/data/perfilTrabajador.repo.js'
 import * as propuestasRepo from '@/lib/data/propuestas.repo.js'
+import * as contratacionesRepo from '@/lib/data/contrataciones.repo.js'
 import { calcularCompletitud } from '@/lib/perfil.js'
 import Button from '@/components/ui/Button.jsx'
 import Card from '@/components/ui/Card.jsx'
 import Spinner from '@/components/ui/Spinner.jsx'
 import TarjetaPropuesta from './TarjetaPropuesta.jsx'
+import TarjetaContratacion from '../contrataciones/TarjetaContratacion.jsx'
+
+const ACTIVOS = ['en_curso', 'pendiente_confirmacion', 'reportado']
 
 export default function Dashboard() {
   const { usuario } = useAuth()
   const [perfil, setPerfil] = useState(null)
   const [propuestas, setPropuestas] = useState([])
+  const [contrataciones, setContrataciones] = useState([])
   const [cargandoPropuestas, setCargandoPropuestas] = useState(true)
 
   useEffect(() => {
@@ -22,24 +27,35 @@ export default function Dashboard() {
       .listarPorTrabajador(usuario.id)
       .then((data) => activo && setPropuestas(data))
       .finally(() => activo && setCargandoPropuestas(false))
+    contratacionesRepo
+      .listar()
+      .then((data) => activo && setContrataciones(data))
+      .catch(() => {})
     return () => {
       activo = false
     }
   }, [usuario.id])
 
   const completitud = perfil ? calcularCompletitud(perfil) : null
+  const activas = contrataciones.filter((c) => ACTIVOS.includes(c.estado))
 
-  // Las aceptadas primero; después, la más reciente.
-  const recientes = useMemo(() => {
-    return [...propuestas]
-      .sort((a, b) => {
-        const prioridad = (p) => (p.estado === 'aceptada' ? 0 : 1)
-        const diff = prioridad(a) - prioridad(b)
-        if (diff !== 0) return diff
-        return new Date(b.createdAt) - new Date(a.createdAt)
-      })
-      .slice(0, 3)
-  }, [propuestas])
+  const pendientes = useMemo(
+    () =>
+      propuestas.filter(
+        (p) => p.estado === 'enviada' && p.solicitudEstado !== 'cancelada',
+      ),
+    [propuestas],
+  )
+  const modificadas = useMemo(
+    () =>
+      propuestas.filter(
+        (p) =>
+          (p.estado === 'enviada' && p.solicitudEstado === 'cancelada') ||
+          p.estado === 'rechazada' ||
+          p.estado === 'retirada',
+      ),
+    [propuestas],
+  )
 
   return (
     <div className="space-y-6">
@@ -88,9 +104,25 @@ export default function Dashboard() {
             </Card>
           )}
 
+          {activas.length > 0 && (
+            <section>
+              <div className="mb-3 flex items-center justify-between">
+                <h2 className="text-lg font-bold">Contrataciones en curso</h2>
+                <Link to="/trabajador/contrataciones" className="text-sm font-bold text-primary">
+                  Ver todas
+                </Link>
+              </div>
+              <div className="space-y-3">
+                {activas.map((c) => (
+                  <TarjetaContratacion key={c.id} contratacion={c} base="/trabajador" />
+                ))}
+              </div>
+            </section>
+          )}
+
           <section>
             <div className="mb-3 flex items-center justify-between">
-              <h2 className="text-lg font-bold">Últimas propuestas enviadas</h2>
+              <h2 className="text-lg font-bold">Mis propuestas</h2>
               {propuestas.length > 0 && (
                 <Link to="/trabajador/propuestas" className="text-sm font-bold text-primary">
                   Ver todas
@@ -102,7 +134,7 @@ export default function Dashboard() {
               <div className="flex justify-center py-8 text-primary">
                 <Spinner className="h-7 w-7" />
               </div>
-            ) : recientes.length === 0 ? (
+            ) : propuestas.length === 0 ? (
               <Card className="text-center">
                 <p className="font-semibold text-ink">Todavía no enviaste propuestas</p>
                 <p className="mt-1 text-sm text-muted">
@@ -113,10 +145,27 @@ export default function Dashboard() {
                 </Link>
               </Card>
             ) : (
-              <div className="space-y-3">
-                {recientes.map((p) => (
-                  <TarjetaPropuesta key={p.id} propuesta={p} />
-                ))}
+              <div className="space-y-4">
+                {pendientes.length > 0 && (
+                  <div className="space-y-3">
+                    <p className="text-xs font-bold uppercase tracking-wide text-muted">
+                      Pendientes
+                    </p>
+                    {pendientes.slice(0, 2).map((p) => (
+                      <TarjetaPropuesta key={p.id} propuesta={p} />
+                    ))}
+                  </div>
+                )}
+                {modificadas.length > 0 && (
+                  <div className="space-y-3">
+                    <p className="text-xs font-bold uppercase tracking-wide text-muted">
+                      Con cambios
+                    </p>
+                    {modificadas.slice(0, 2).map((p) => (
+                      <TarjetaPropuesta key={p.id} propuesta={p} />
+                    ))}
+                  </div>
+                )}
               </div>
             )}
           </section>

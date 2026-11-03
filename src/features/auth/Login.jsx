@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link, useLocation, useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '@/context/AuthContext.jsx'
 import { useToast } from '@/components/ui/Toast.jsx'
 import { mensajeError } from '@/lib/errores.js'
@@ -17,7 +17,6 @@ export default function Login() {
   const { iniciarSesion } = useAuth()
   const { mostrar } = useToast()
   const navigate = useNavigate()
-  const location = useLocation()
 
   const [form, setForm] = useState({ email: '', password: '' })
   const [error, setError] = useState('')
@@ -36,7 +35,7 @@ export default function Login() {
       setEnviando(true)
       const usuario = await iniciarSesion(form)
       mostrar(`Hola de nuevo, ${usuario.nombre}.`, 'exito')
-      const destino = location.state?.from?.pathname ?? DESTINO_POR_ROL[usuario.rol] ?? '/'
+      const destino = DESTINO_POR_ROL[usuario.rol] ?? '/'
       navigate(destino, { replace: true })
     } catch (err) {
       setError(mensajeError(err))

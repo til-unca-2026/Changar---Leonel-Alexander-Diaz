@@ -10,6 +10,11 @@ const VARIANTES = {
   activo: 'bg-green-50 text-success',
   pendiente: 'bg-amber-50 text-warning',
   inactivo: 'bg-slate-100 text-muted',
+  en_curso: 'bg-primary-soft text-primary',
+  pendiente_confirmacion: 'bg-amber-50 text-warning',
+  completado: 'bg-green-50 text-success',
+  cancelado: 'bg-red-50 text-danger',
+  reportado: 'bg-red-50 text-danger',
   neutral: 'bg-slate-100 text-muted',
 }
 
@@ -25,6 +30,11 @@ const ETIQUETAS = {
   activo: 'Activo',
   pendiente: 'Pendiente',
   inactivo: 'Inactivo',
+  en_curso: 'En curso',
+  pendiente_confirmacion: 'Pendiente de confirmación',
+  completado: 'Completado',
+  cancelado: 'Cancelado',
+  reportado: 'Reportado',
 }
 
 export default function Badge({ estado = 'neutral', children, className = '' }) {

@@ -1,5 +1,8 @@
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import Badge from '@/components/ui/Badge.jsx'
+import ReputacionResumen from '@/components/ReputacionResumen.jsx'
+import * as propuestasRepo from '@/lib/data/propuestas.repo.js'
 import { fechaRelativa, formatearPesos } from '@/lib/format.js'
 
 function IconoFoto() {
@@ -13,6 +16,19 @@ function IconoFoto() {
 }
 
 export default function TarjetaOferta({ solicitud }) {
+  const [postulantes, setPostulantes] = useState(null)
+
+  useEffect(() => {
+    let activo = true
+    propuestasRepo
+      .postulantesDe(solicitud.id)
+      .then((n) => activo && setPostulantes(n))
+      .catch(() => activo && setPostulantes(null))
+    return () => {
+      activo = false
+    }
+  }, [solicitud.id])
+
   const foto = solicitud.fotos?.[0]?.url
 
   return (
@@ -34,11 +50,23 @@ export default function TarjetaOferta({ solicitud }) {
           <p className="mt-0.5 text-sm font-semibold text-primary">{solicitud.oficioNombre}</p>
           <p className="mt-1 line-clamp-2 text-sm text-muted">{solicitud.descripcion}</p>
           <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted">
+            {postulantes !== null && (
+              <>
+                <span className="font-semibold text-ink">
+                  {postulantes} {postulantes === 1 ? 'postulante' : 'postulantes'}
+                </span>
+                <span aria-hidden="true">·</span>
+              </>
+            )}
             <span>{solicitud.ubicacion}</span>
             <span aria-hidden="true">·</span>
             <span>{formatearPesos(solicitud.presupuestoMax)}</span>
             <span aria-hidden="true">·</span>
             <span>{fechaRelativa(solicitud.createdAt)}</span>
+          </div>
+
+          <div className="mt-2">
+            <ReputacionResumen perfilId={solicitud.clienteId} />
           </div>
         </div>
       </article>

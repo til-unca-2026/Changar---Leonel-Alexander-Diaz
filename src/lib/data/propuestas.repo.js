@@ -44,7 +44,7 @@ export async function listarPorSolicitud(solicitudId) {
   const { data, error } = await supabase
     .from('propuestas')
     .select(
-      'id, descripcion, presupuesto, estado, created_at, trabajador_id, trabajador:perfiles!propuestas_trabajador_id_fkey(nombre, apellido, avatar_path)',
+      'id, descripcion, presupuesto, estado, created_at, trabajador_id, trabajador:perfiles!propuestas_trabajador_id_fkey(nombre, apellido, avatar_path, trabajador_oficios(oficio_id))',
     )
     .eq('solicitud_id', solicitudId)
     .order('created_at', { ascending: false })
@@ -62,7 +62,15 @@ export async function listarPorSolicitud(solicitudId) {
     trabajadorAvatar: p.trabajador?.avatar_path
       ? urlPublica('avatares', p.trabajador.avatar_path)
       : null,
+    trabajadorOficios: (p.trabajador?.trabajador_oficios ?? []).map((r) => r.oficio_id),
   }))
+}
+
+/** Cantidad de propuestas que recibió una solicitud (público). */
+export async function postulantesDe(solicitudId) {
+  const { data, error } = await supabase.rpc('postulantes_de', { p_solicitud_id: solicitudId })
+  if (error) throw error
+  return data ?? 0
 }
 
 /** Propuesta del trabajador para una solicitud, si existe. */
