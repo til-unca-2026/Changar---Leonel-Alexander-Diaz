@@ -21,6 +21,8 @@ import PerfilTrabajadorPage from '@/features/trabajador/Perfil.jsx'
 import Portfolio from '@/features/trabajador/Portfolio.jsx'
 import AdminDashboard from '@/features/admin/Dashboard.jsx'
 import AdminOficios from '@/features/admin/Oficios.jsx'
+import AdminUsuarios from '@/features/admin/Usuarios.jsx'
+import AdminReportes from '@/features/admin/Reportes.jsx'
 
 const DESTINO_POR_ROL = {
   cliente: '/cliente',
@@ -78,6 +80,8 @@ export default function App() {
         <Route element={<AppLayout />}>
           <Route path="/admin" element={<AdminDashboard />} />
           <Route path="/admin/oficios" element={<AdminOficios />} />
+          <Route path="/admin/usuarios" element={<AdminUsuarios />} />
+          <Route path="/admin/reportes" element={<AdminReportes />} />
         </Route>
       </Route>
 

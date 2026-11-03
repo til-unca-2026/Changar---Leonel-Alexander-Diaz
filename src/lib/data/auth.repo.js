@@ -7,7 +7,7 @@ import { urlPublica } from './almacenamiento.js'
  * de la base (está oculto por grants), se toma de la sesión de Auth.
  */
 
-const COLUMNAS_PERFIL = 'id, nombre, apellido, avatar_path, rol, activo, created_at'
+const COLUMNAS_PERFIL = 'id, nombre, apellido, avatar_path, rol, activo, baneado_hasta, created_at'
 
 function componer(perfil, telefono, email) {
   const avatar = perfil.avatar_path ?? null
@@ -19,6 +19,7 @@ function componer(perfil, telefono, email) {
     telefono: telefono ?? '',
     rol: perfil.rol,
     activo: perfil.activo,
+    baneadoHasta: perfil.baneado_hasta ?? null,
     avatar,
     avatarUrl: avatar ? urlPublica('avatares', avatar) : null,
     createdAt: perfil.created_at,

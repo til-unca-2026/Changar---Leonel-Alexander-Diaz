@@ -93,6 +93,8 @@ export async function reportesDe(perfilId) {
       ? urlPublica('avatares', r.contraparte_avatar)
       : null,
     createdAt: r.created_at,
+    resuelto: Boolean(r.resuelto),
+    resueltoAFavorNombre: r.resuelto_a_favor_nombre ?? null,
     reporte: r.reporte
       ? {
           comentario: r.reporte.comentario ?? '',
@@ -110,6 +112,16 @@ export async function reportesDe(perfilId) {
         }
       : null,
   }))
+}
+
+/** Denuncia un perfil como sospechoso/fraudulento. */
+export async function reportar(perfilId, reportanteId, motivo) {
+  const { error } = await supabase.from('reportes').insert({
+    perfil_id: perfilId,
+    reportante_id: reportanteId,
+    motivo,
+  })
+  if (error) throw error
 }
 
 /** Historial público de contratos cancelados. */

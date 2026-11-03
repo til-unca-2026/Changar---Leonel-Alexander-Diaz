@@ -1,12 +1,17 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
+import { useAuth } from '@/context/AuthContext.jsx'
+import { useToast } from '@/components/ui/Toast.jsx'
 import * as perfilesRepo from '@/lib/data/perfiles.repo.js'
 import * as valoracionesRepo from '@/lib/data/valoraciones.repo.js'
+import { mensajeError } from '@/lib/errores.js'
 import { fechaRelativa } from '@/lib/format.js'
 import Avatar from '@/components/ui/Avatar.jsx'
 import Badge from '@/components/ui/Badge.jsx'
+import Button from '@/components/ui/Button.jsx'
 import Card from '@/components/ui/Card.jsx'
 import Spinner from '@/components/ui/Spinner.jsx'
+import Textarea from '@/components/ui/Textarea.jsx'
 
 const ROL = {
   cliente: 'Cliente',
@@ -43,12 +48,17 @@ function Estrellas({ n }) {
 
 export default function PublicProfile() {
   const { id } = useParams()
+  const { usuario } = useAuth()
+  const { mostrar } = useToast()
   const [perfil, setPerfil] = useState(null)
   const [reportes, setReportes] = useState([])
   const [cancelados, setCancelados] = useState([])
   const [reputacion, setReputacion] = useState(null)
   const [valoraciones, setValoraciones] = useState([])
   const [cargando, setCargando] = useState(true)
+  const [reportando, setReportando] = useState(false)
+  const [motivoReporte, setMotivoReporte] = useState('')
+  const [enviandoReporte, setEnviandoReporte] = useState(false)
 
   useEffect(() => {
     let activo = true
@@ -92,6 +102,24 @@ export default function PublicProfile() {
       activo = false
     }
   }, [id])
+
+  async function enviarReporte() {
+    if (!motivoReporte.trim()) {
+      mostrar('Escribí el motivo del reporte.', 'error')
+      return
+    }
+    try {
+      setEnviandoReporte(true)
+      await perfilesRepo.reportar(id, usuario.id, motivoReporte)
+      mostrar('Reporte enviado.', 'exito')
+      setReportando(false)
+      setMotivoReporte('')
+    } catch (err) {
+      mostrar(mensajeError(err), 'error')
+    } finally {
+      setEnviandoReporte(false)
+    }
+  }
 
   if (cargando) {
     return (
@@ -373,10 +401,55 @@ export default function PublicProfile() {
                     </div>
                   )}
                 </div>
+
+                {r.resuelto && (
+                  <p className="mt-3 text-sm font-semibold text-success">
+                    Resuelto a favor de {r.resueltoAFavorNombre}.
+                  </p>
+                )}
               </Card>
             ))}
           </div>
         </section>
+      )}
+
+      {perfil.id !== usuario?.id && (
+        <Card>
+          {reportando ? (
+            <div className="space-y-3">
+              <h2 className="font-bold">Reportar perfil</h2>
+              <Textarea
+                label="Motivo"
+                value={motivoReporte}
+                onChange={(e) => setMotivoReporte(e.target.value)}
+                placeholder="Explicá por qué reportás este perfil."
+              />
+              <div className="flex gap-2">
+                <Button className="w-full sm:w-auto" onClick={enviarReporte} disabled={enviandoReporte}>
+                  {enviandoReporte ? 'Enviando…' : 'Enviar reporte'}
+                </Button>
+                <Button
+                  variante="outline"
+                  className="w-full sm:w-auto"
+                  onClick={() => {
+                    setReportando(false)
+                    setMotivoReporte('')
+                  }}
+                >
+                  Cancelar
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <Button
+              variante="outline"
+              className="w-full sm:w-auto"
+              onClick={() => setReportando(true)}
+            >
+              Reportar perfil
+            </Button>
+          )}
+        </Card>
       )}
     </div>
   )

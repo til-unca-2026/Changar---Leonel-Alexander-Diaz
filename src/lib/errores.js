@@ -24,6 +24,11 @@ const MENSAJES = {
   puntuacion_invalida: 'La puntuación debe estar entre 1 y 5 estrellas.',
   contratacion_no_completada: 'Solo se puede valorar una contratación completada.',
   valoracion_duplicada: 'Ya valoraste esta contratación.',
+  reporte_no_encontrado: 'El reporte no existe.',
+  accion_invalida: 'Acción no válida.',
+  parte_invalida: 'La parte indicada no es válida.',
+  no_puede_banearse_a_si_mismo: 'No podés sancionarte a vos mismo.',
+  no_puede_cambiar_su_rol: 'No podés cambiar tu propio rol.',
 }
 
 const MENSAJES_SUPABASE = {
@@ -63,6 +68,11 @@ export function mensajeError(error) {
   if (/puntuacion_invalida/i.test(codigo)) return MENSAJES.puntuacion_invalida
   if (/contratacion_no_completada/i.test(codigo)) return MENSAJES.contratacion_no_completada
   if (/valoracion_duplicada/i.test(codigo)) return MENSAJES.valoracion_duplicada
+  if (/reporte_no_encontrado/i.test(codigo)) return MENSAJES.reporte_no_encontrado
+  if (/accion_invalida/i.test(codigo)) return MENSAJES.accion_invalida
+  if (/parte_invalida/i.test(codigo)) return MENSAJES.parte_invalida
+  if (/no_puede_banearse_a_si_mismo/i.test(codigo)) return MENSAJES.no_puede_banearse_a_si_mismo
+  if (/no_puede_cambiar_su_rol/i.test(codigo)) return MENSAJES.no_puede_cambiar_su_rol
 
   if (/propuestas_solicitud_id_trabajador_id_key/i.test(codigo)) {
     return 'Ya enviaste una propuesta a esta solicitud.'

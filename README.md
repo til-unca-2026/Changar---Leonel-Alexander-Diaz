@@ -25,8 +25,10 @@ un sistema de reputación basado en trabajos realizados y valoraciones.
   previos del postulante.
 - **Valoraciones y reputación**: valoración mutua (1-5 + comentario + fotos) al completar
   una contratación; promedio y distribución visibles en perfiles y listados.
-- **Panel de administración (etapa 1)**: métricas generales y moderación de oficios
-  (aprobar, rechazar y fusionar duplicados).
+- **Panel de administración**: métricas con filtro por período, moderación de oficios
+  (aprobar, rechazar y fusionar duplicados), gestión de usuarios (marcas de advertencia
+  privadas, ban temporal/permanente, cambio de rol) y reportes de perfiles y contratos
+  reportados (con resolución a favor de una parte).
 - **Próxima etapa**: valoraciones y reputación, notificaciones, gestión de usuarios y
   reportes, y despliegue.
 
@@ -96,7 +98,7 @@ src/
 │  │              # TarjetaOferta
 │  ├─ contrataciones/ # ListaContrataciones, DetalleContratacion, Bitacora
 │  ├─ perfiles/      # PublicProfile (perfil público con reputación y reportes)
-│  └─ admin/      # Dashboard (métricas), Oficios (moderación)
+│  └─ admin/      # Dashboard (métricas + filtro), Oficios, Usuarios, Reportes
 ├─ hooks/         # useSolicitudes, useOficios, useReputacion
 └─ lib/
    ├─ data/       # repositorios Supabase: auth, oficios, perfiles, solicitudes,
