@@ -25,6 +25,7 @@ export default function DetalleSolicitud() {
   const [cargando, setCargando] = useState(true)
   const [aceptando, setAceptando] = useState(null)
   const [procesando, setProcesando] = useState(false)
+  const [cancelando, setCancelando] = useState(false)
 
   useEffect(() => {
     let activo = true
@@ -57,6 +58,32 @@ export default function DetalleSolicitud() {
       setAceptando(null)
     } finally {
       setProcesando(false)
+    }
+  }
+
+  async function recargar() {
+    const [sol, props] = await Promise.all([
+      solicitudesRepo.obtener(id),
+      propuestasRepo.listarPorSolicitud(id),
+    ])
+    setSolicitud(sol)
+    setPropuestas(props)
+    setContratacion(null)
+    const aceptada = props.find((p) => p.estado === 'aceptada')
+    if (aceptada) setContratacion(await contratacionesRepo.obtenerPorPropuesta(aceptada.id))
+  }
+
+  async function cancelarSolicitud() {
+    if (!window.confirm('¿Cancelar esta solicitud?')) return
+    try {
+      setCancelando(true)
+      await solicitudesRepo.cancelar(id)
+      mostrar('Solicitud cancelada.', 'info')
+      await recargar()
+    } catch (err) {
+      mostrar(mensajeError(err), 'error')
+    } finally {
+      setCancelando(false)
     }
   }
 
@@ -122,6 +149,19 @@ export default function DetalleSolicitud() {
                 <img src={foto.url} alt="" className="h-full w-full object-cover" />
               </div>
             ))}
+          </div>
+        )}
+
+        {solicitud.estado === 'abierta' && (
+          <div className="mt-4 border-t border-line pt-4">
+            <Button
+              variante="outline"
+              className="w-full sm:w-auto"
+              onClick={cancelarSolicitud}
+              disabled={cancelando}
+            >
+              {cancelando ? 'Cancelando…' : 'Cancelar solicitud'}
+            </Button>
           </div>
         )}
       </Card>

@@ -7,6 +7,7 @@ import Registro from '@/features/auth/Registro.jsx'
 import OnboardingTrabajador from '@/features/auth/OnboardingTrabajador.jsx'
 import Perfil from '@/features/auth/Perfil.jsx'
 import PublicProfile from '@/features/perfiles/PublicProfile.jsx'
+import CentroNotificaciones from '@/features/notificaciones/CentroNotificaciones.jsx'
 import ClienteDashboard from '@/features/cliente/Dashboard.jsx'
 import MisSolicitudes from '@/features/cliente/MisSolicitudes.jsx'
 import NuevaSolicitud from '@/features/cliente/NuevaSolicitud.jsx'
@@ -90,6 +91,7 @@ export default function App() {
         <Route element={<AppLayout />}>
           <Route path="/perfil" element={<Perfil />} />
           <Route path="/perfiles/:id" element={<PublicProfile />} />
+          <Route path="/notificaciones" element={<CentroNotificaciones />} />
         </Route>
       </Route>
 

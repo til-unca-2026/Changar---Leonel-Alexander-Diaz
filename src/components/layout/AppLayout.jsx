@@ -1,5 +1,7 @@
-import { Link, NavLink, Outlet } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import { Link, NavLink, Outlet, useLocation } from 'react-router-dom'
 import { useAuth } from '@/context/AuthContext.jsx'
+import * as notifRepo from '@/lib/data/notificaciones.repo.js'
 import UserMenu from './UserMenu.jsx'
 
 function Icono({ d, className = 'h-6 w-6' }) {
@@ -114,6 +116,20 @@ export default function AppLayout() {
   const { usuario } = useAuth()
   const nav = NAV_POR_ROL[usuario?.rol] ?? { mobile: [], desktop: [] }
   const inicio = INICIO_POR_ROL[usuario?.rol] ?? '/'
+  const location = useLocation()
+  const [noLeidas, setNoLeidas] = useState(0)
+
+  useEffect(() => {
+    if (!usuario?.id) return
+    let activo = true
+    notifRepo
+      .noLeidas(usuario.id)
+      .then((n) => activo && setNoLeidas(n))
+      .catch(() => {})
+    return () => {
+      activo = false
+    }
+  }, [usuario?.id, location.pathname])
 
   return (
     <div className="min-h-screen bg-canvas">
@@ -125,8 +141,8 @@ export default function AppLayout() {
           </Link>
 
           <div className="flex items-center gap-2">
-            <button
-              type="button"
+            <Link
+              to="/notificaciones"
               className="relative flex h-10 w-10 items-center justify-center rounded-full bg-primary-soft text-primary transition hover:brightness-95"
               aria-label="Notificaciones"
             >
@@ -141,7 +157,12 @@ export default function AppLayout() {
               >
                 <path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9M13.7 21a2 2 0 0 1-3.4 0" />
               </svg>
-            </button>
+              {noLeidas > 0 && (
+                <span className="absolute -right-0.5 -top-0.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-danger px-1 text-[11px] font-bold text-white">
+                  {noLeidas}
+                </span>
+              )}
+            </Link>
             <UserMenu />
           </div>
         </div>
