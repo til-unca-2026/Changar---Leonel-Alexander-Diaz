@@ -31,6 +31,11 @@ export default function DetalleSolicitud() {
   const [enviando, setEnviando] = useState(false)
   const [descripcion, setDescripcion] = useState('')
   const [presupuesto, setPresupuesto] = useState('')
+  const [editando, setEditando] = useState(false)
+  const [editDescripcion, setEditDescripcion] = useState('')
+  const [editPresupuesto, setEditPresupuesto] = useState('')
+  const [editError, setEditError] = useState('')
+  const [accionando, setAccionando] = useState(false)
 
   useEffect(() => {
     let activo = true
@@ -83,6 +88,66 @@ export default function DetalleSolicitud() {
       setError(mensajeError(err))
     } finally {
       setEnviando(false)
+    }
+  }
+
+  async function recargar() {
+    const [sol, prop] = await Promise.all([
+      solicitudesRepo.obtener(id),
+      propuestasRepo.miPropuesta(id, usuario.id),
+    ])
+    setSolicitud(sol)
+    setMiPropuesta(prop)
+    setContratacion(null)
+    if (prop?.estado === 'aceptada') {
+      setContratacion(await contratacionesRepo.obtenerPorPropuesta(prop.id))
+    }
+  }
+
+  function abrirEditar() {
+    setEditDescripcion(miPropuesta.descripcion)
+    setEditPresupuesto(String(miPropuesta.presupuesto))
+    setEditError('')
+    setEditando(true)
+  }
+
+  async function guardarEdicion() {
+    setEditError('')
+    if (!editDescripcion.trim()) {
+      setEditError('Escribí la descripción.')
+      return
+    }
+    if (!editPresupuesto || Number(editPresupuesto) <= 0) {
+      setEditError('Ingresá un presupuesto válido.')
+      return
+    }
+    try {
+      setAccionando(true)
+      await propuestasRepo.editar(miPropuesta.id, {
+        descripcion: editDescripcion,
+        presupuesto: Number(editPresupuesto),
+      })
+      mostrar('Propuesta actualizada.', 'exito')
+      setEditando(false)
+      await recargar()
+    } catch (err) {
+      setEditError(mensajeError(err))
+    } finally {
+      setAccionando(false)
+    }
+  }
+
+  async function retirar() {
+    if (!window.confirm('¿Retirar esta propuesta?')) return
+    try {
+      setAccionando(true)
+      await propuestasRepo.retirar(miPropuesta.id)
+      mostrar('Propuesta retirada.', 'info')
+      await recargar()
+    } catch (err) {
+      mostrar(mensajeError(err), 'error')
+    } finally {
+      setAccionando(false)
     }
   }
 
@@ -155,23 +220,83 @@ export default function DetalleSolicitud() {
       {miPropuesta ? (
         <Card className="border-primary/30 bg-primary-soft">
           <div className="flex items-center justify-between gap-3">
-            <h2 className="font-bold text-ink">Ya enviaste una propuesta</h2>
+            <h2 className="font-bold text-ink">
+              {miPropuesta.estado === 'retirada'
+                ? 'Propuesta retirada'
+                : 'Ya enviaste una propuesta'}
+            </h2>
             <Badge estado={miPropuesta.estado} />
           </div>
-          <p className="mt-2 whitespace-pre-line text-sm text-ink">{miPropuesta.descripcion}</p>
-          <p className="mt-2 text-sm font-bold text-primary">
-            Presupuesto: {formatearPesos(miPropuesta.presupuesto)}
-          </p>
-          <p className="mt-1 text-xs text-muted">
-            Enviada {fechaRelativa(miPropuesta.created_at).toLowerCase()}
-          </p>
-          {contratacion && (
-            <Link
-              to={`/trabajador/contrataciones/${contratacion.id}`}
-              className="mt-3 block sm:inline-block"
-            >
-              <Button className="w-full sm:w-auto">Ver contratación</Button>
-            </Link>
+
+          {editando ? (
+            <div className="mt-3 space-y-4">
+              <Textarea
+                label="Descripción"
+                value={editDescripcion}
+                onChange={(e) => setEditDescripcion(e.target.value)}
+              />
+              <Input
+                label="Presupuesto estimado"
+                type="number"
+                min="0"
+                value={editPresupuesto}
+                onChange={(e) => setEditPresupuesto(e.target.value)}
+              />
+              {editError && <p className="text-sm font-semibold text-danger">{editError}</p>}
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <Button className="w-full sm:w-auto" onClick={guardarEdicion} disabled={accionando}>
+                  {accionando ? 'Guardando…' : 'Guardar cambios'}
+                </Button>
+                <Button
+                  variante="outline"
+                  className="w-full sm:w-auto"
+                  onClick={() => setEditando(false)}
+                  disabled={accionando}
+                >
+                  Cancelar
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <>
+              <p className="mt-2 whitespace-pre-line text-sm text-ink">{miPropuesta.descripcion}</p>
+              <p className="mt-2 text-sm font-bold text-primary">
+                Presupuesto: {formatearPesos(miPropuesta.presupuesto)}
+              </p>
+              <p className="mt-1 text-xs text-muted">
+                Enviada {fechaRelativa(miPropuesta.created_at).toLowerCase()}
+              </p>
+
+              {miPropuesta.estado === 'enviada' && (
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <Button
+                    variante="outline"
+                    className="w-full sm:w-auto"
+                    onClick={abrirEditar}
+                    disabled={accionando}
+                  >
+                    Editar
+                  </Button>
+                  <Button
+                    variante="outline"
+                    className="w-full sm:w-auto"
+                    onClick={retirar}
+                    disabled={accionando}
+                  >
+                    Retirar
+                  </Button>
+                </div>
+              )}
+
+              {contratacion && (
+                <Link
+                  to={`/trabajador/contrataciones/${contratacion.id}`}
+                  className="mt-3 block sm:inline-block"
+                >
+                  <Button className="w-full sm:w-auto">Ver contratación</Button>
+                </Link>
+              )}
+            </>
           )}
         </Card>
       ) : solicitud.estado !== 'abierta' ? (

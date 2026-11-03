@@ -73,6 +73,26 @@ export async function postulantesDe(solicitudId) {
   return data ?? 0
 }
 
+/** Retira la propuesta (pasa a 'retirada') mientras esté 'enviada'. */
+export async function retirar(id) {
+  const { error } = await supabase
+    .from('propuestas')
+    .update({ estado: 'retirada', updated_at: new Date().toISOString() })
+    .eq('id', id)
+    .eq('estado', 'enviada')
+  if (error) throw error
+}
+
+/** Edita la descripción y presupuesto de una propuesta 'enviada'. */
+export async function editar(id, { descripcion, presupuesto }) {
+  const { error } = await supabase.rpc('editar_propuesta', {
+    p_propuesta_id: id,
+    p_descripcion: descripcion,
+    p_presupuesto: presupuesto,
+  })
+  if (error) throw error
+}
+
 /** Propuesta del trabajador para una solicitud, si existe. */
 export async function miPropuesta(solicitudId, trabajadorId) {
   const { data, error } = await supabase

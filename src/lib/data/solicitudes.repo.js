@@ -93,3 +93,9 @@ export async function obtener(id) {
   if (error) throw error
   return mapear(data)
 }
+
+/** Cancela la solicitud (mientras esté 'abierta') y rechaza sus propuestas enviadas. */
+export async function cancelar(id) {
+  const { error } = await supabase.rpc('cancelar_solicitud', { p_solicitud_id: id })
+  if (error) throw error
+}

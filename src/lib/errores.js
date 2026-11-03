@@ -29,6 +29,9 @@ const MENSAJES = {
   parte_invalida: 'La parte indicada no es válida.',
   no_puede_banearse_a_si_mismo: 'No podés sancionarte a vos mismo.',
   no_puede_cambiar_su_rol: 'No podés cambiar tu propio rol.',
+  estado_invalido: 'La acción no es válida en el estado actual.',
+  propuesta_no_encontrada: 'La propuesta no existe.',
+  propuesta_no_disponible: 'La propuesta ya no está disponible.',
 }
 
 const MENSAJES_SUPABASE = {
@@ -73,6 +76,9 @@ export function mensajeError(error) {
   if (/parte_invalida/i.test(codigo)) return MENSAJES.parte_invalida
   if (/no_puede_banearse_a_si_mismo/i.test(codigo)) return MENSAJES.no_puede_banearse_a_si_mismo
   if (/no_puede_cambiar_su_rol/i.test(codigo)) return MENSAJES.no_puede_cambiar_su_rol
+  if (/estado_invalido/i.test(codigo)) return MENSAJES.estado_invalido
+  if (/propuesta_no_encontrada/i.test(codigo)) return MENSAJES.propuesta_no_encontrada
+  if (/propuesta_no_disponible/i.test(codigo)) return MENSAJES.propuesta_no_disponible
 
   if (/propuestas_solicitud_id_trabajador_id_key/i.test(codigo)) {
     return 'Ya enviaste una propuesta a esta solicitud.'

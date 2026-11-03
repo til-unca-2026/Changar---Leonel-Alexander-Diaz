@@ -31,8 +31,7 @@ un sistema de reputación basado en trabajos realizados y valoraciones.
   reportados (con resolución a favor de una parte).
 - **Notificaciones in-app**: avisos por propuestas, contrataciones, valoraciones, oficios y
   reportes, con centro de notificaciones y badge en el header.
-- **Próxima etapa**: menores (retirar propuesta, cancelar solicitud), Realtime (opcional) y
-  despliegue.
+- **Próxima etapa**: Realtime (opcional), despliegue y documentación.
 
 ## Configuración
 
