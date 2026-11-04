@@ -67,6 +67,7 @@ const NAV_POR_ROL = {
       { a: '/cliente', icono: 'inicio', texto: 'Inicio' },
       { a: '/cliente/solicitudes', icono: 'solicitudes', texto: 'Solicitudes' },
       { a: '/cliente/solicitudes/nueva', icono: 'publicar', texto: 'Publicar' },
+      { a: '/cliente/explorar', icono: 'explorar', texto: 'Buscar profesional' },
       { a: '/cliente/contrataciones', icono: 'contrataciones', texto: 'Contrataciones' },
       { a: '/perfil', icono: 'perfil', texto: 'Mi cuenta' },
     ],
@@ -92,12 +93,14 @@ const NAV_POR_ROL = {
   admin: {
     mobile: [
       { a: '/admin', icono: 'inicio', texto: 'Panel' },
+      { a: '/admin/explorar', icono: 'explorar', texto: 'Explorar' },
       { a: '/admin/usuarios', icono: 'perfil', texto: 'Usuarios' },
       { a: '/admin/oficios', icono: 'oficios', texto: 'Oficios' },
       { a: '/admin/reportes', icono: 'reportes', texto: 'Reportes' },
     ],
     desktop: [
       { a: '/admin', icono: 'inicio', texto: 'Panel' },
+      { a: '/admin/explorar', icono: 'explorar', texto: 'Explorar' },
       { a: '/admin/usuarios', icono: 'perfil', texto: 'Usuarios' },
       { a: '/admin/oficios', icono: 'oficios', texto: 'Oficios' },
       { a: '/admin/reportes', icono: 'reportes', texto: 'Reportes' },

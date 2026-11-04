@@ -108,6 +108,18 @@ export default function Dashboard() {
         </div>
 
         <aside className="space-y-6">
+          <Link to="/cliente/explorar" className="block">
+            <Card className="flex items-center justify-between bg-primary-soft">
+              <span>
+                <span className="block font-bold text-ink">Buscar profesional</span>
+                <span className="block text-sm text-muted">
+                  Encontrá uno y envíale una solicitud directa.
+                </span>
+              </span>
+              <span className="font-bold text-primary">→</span>
+            </Card>
+          </Link>
+
           <Link to="/cliente/contrataciones" className="block">
             <Card className="flex items-center justify-between">
               <span>

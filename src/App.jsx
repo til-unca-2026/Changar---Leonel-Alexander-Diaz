@@ -12,6 +12,7 @@ import ClienteDashboard from '@/features/cliente/Dashboard.jsx'
 import MisSolicitudes from '@/features/cliente/MisSolicitudes.jsx'
 import NuevaSolicitud from '@/features/cliente/NuevaSolicitud.jsx'
 import ClienteDetalleSolicitud from '@/features/cliente/DetalleSolicitud.jsx'
+import ClienteExplorar from '@/features/cliente/Explorar.jsx'
 import ListaContrataciones from '@/features/contrataciones/ListaContrataciones.jsx'
 import DetalleContratacion from '@/features/contrataciones/DetalleContratacion.jsx'
 import TrabajadorDashboard from '@/features/trabajador/Dashboard.jsx'
@@ -24,6 +25,7 @@ import AdminDashboard from '@/features/admin/Dashboard.jsx'
 import AdminOficios from '@/features/admin/Oficios.jsx'
 import AdminUsuarios from '@/features/admin/Usuarios.jsx'
 import AdminReportes from '@/features/admin/Reportes.jsx'
+import AdminExplorar from '@/features/admin/Explorar.jsx'
 
 const DESTINO_POR_ROL = {
   cliente: '/cliente',
@@ -57,6 +59,7 @@ export default function App() {
           <Route path="/cliente/solicitudes" element={<MisSolicitudes />} />
           <Route path="/cliente/solicitudes/nueva" element={<NuevaSolicitud />} />
           <Route path="/cliente/solicitudes/:id" element={<ClienteDetalleSolicitud />} />
+          <Route path="/cliente/explorar" element={<ClienteExplorar />} />
           <Route path="/cliente/contrataciones" element={<ListaContrataciones />} />
           <Route path="/cliente/contrataciones/:id" element={<DetalleContratacion />} />
         </Route>
@@ -83,6 +86,7 @@ export default function App() {
           <Route path="/admin/oficios" element={<AdminOficios />} />
           <Route path="/admin/usuarios" element={<AdminUsuarios />} />
           <Route path="/admin/reportes" element={<AdminReportes />} />
+          <Route path="/admin/explorar" element={<AdminExplorar />} />
         </Route>
       </Route>
 
