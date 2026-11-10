@@ -90,7 +90,7 @@ export default function Explorar() {
           </p>
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
             {resultados.map((p) => (
-              <TarjetaProfesional key={p.id} perfil={p} />
+              <TarjetaProfesional key={p.id} perfil={p} oficioFiltro={oficioId} />
             ))}
           </div>
         </>

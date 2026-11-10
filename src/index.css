@@ -7,8 +7,12 @@
  *
  * Temas por rol (sobrescriben --color-primary en el subárbol autenticado):
  * - Trabajador: azul (default)
- * - Cliente: verde (mismo grado 600)
- * - Admin: naranja (mismo grado 600)
+ * - Cliente: verde (green-700)
+ * - Admin: violeta
+ *
+ * La banda superior usa --color-primary-dark (más profunda) para que el
+ * logo, los iconos y el nombre de usuario en blanco siempre tengan
+ * contraste AA.
  */
 @theme {
   --color-primary: #2563eb;
@@ -34,8 +38,8 @@
 }
 
 .tema-cliente {
-  --color-primary: #16a34a;
-  --color-primary-dark: #15803d;
+  --color-primary: #15803d;
+  --color-primary-dark: #166534;
   --color-primary-soft: #f0fdf4;
 }
 

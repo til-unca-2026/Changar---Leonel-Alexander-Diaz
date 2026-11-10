@@ -155,6 +155,21 @@ export default function PublicProfile() {
         </div>
       </Card>
 
+      {!perfil.habilitado && (
+        <Card className="border-amber-200 bg-amber-50">
+          <p className="font-bold text-warning">
+            {perfil.activo === false ? 'Cuenta bloqueada' : 'Cuenta suspendida'}
+          </p>
+          <p className="mt-1 text-sm text-muted">
+            {perfil.activo === false
+              ? 'Esta cuenta fue bloqueada por el administrador.'
+              : `Esta cuenta está suspendida hasta el ${new Date(
+                  perfil.suspendidoHasta,
+                ).toLocaleDateString('es-AR')}. No puede recibir solicitudes.`}
+          </p>
+        </Card>
+      )}
+
       {/* Reputación */}
       {reputacion && (
         <Card>

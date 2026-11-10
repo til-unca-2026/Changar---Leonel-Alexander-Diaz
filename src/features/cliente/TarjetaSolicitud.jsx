@@ -36,6 +36,14 @@ export default function TarjetaSolicitud({ solicitud, oficioNombre }) {
 
           <p className="mt-1 text-sm font-semibold text-primary">{oficioNombre}</p>
 
+          {solicitud.estado === 'abierta' &&
+            solicitud.trabajadorDestinoId &&
+            solicitud.propuestaPendiente && (
+              <span className="mt-2 inline-flex items-center rounded-full bg-amber-50 px-2.5 py-1 text-xs font-bold text-warning">
+                Esperando tu confirmación
+              </span>
+            )}
+
           <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted">
             <span className={cantidad > 0 ? 'font-semibold text-primary' : ''}>
               {textoPropuestas}

@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase.js'
+import { estaHabilitado } from '@/lib/cuentas.js'
 import { urlPublica } from './almacenamiento.js'
 
 /**
@@ -9,7 +10,7 @@ import { urlPublica } from './almacenamiento.js'
 export async function obtenerBase(id) {
   const { data, error } = await supabase
     .from('perfiles')
-    .select('id, nombre, apellido, avatar_path, rol, created_at')
+    .select('id, nombre, apellido, avatar_path, rol, activo, baneado_hasta, created_at')
     .eq('id', id)
     .maybeSingle()
   if (error) throw error
@@ -21,6 +22,9 @@ export async function obtenerBase(id) {
     rol: data.rol,
     avatarUrl: data.avatar_path ? urlPublica('avatares', data.avatar_path) : null,
     createdAt: data.created_at,
+    activo: data.activo,
+    suspendidoHasta: data.baneado_hasta ?? null,
+    habilitado: estaHabilitado(data),
   }
 }
 
@@ -198,5 +202,6 @@ export async function buscarTrabajadores({ query, oficioId, zona, minRating } = 
     promedio: p.promedio ?? 0,
     bajas: p.bajas ?? 0,
     reportes: p.reportes ?? 0,
+    suspendido: Boolean(p.suspendido),
   }))
 }

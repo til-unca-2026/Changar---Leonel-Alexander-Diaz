@@ -61,6 +61,27 @@ export default function DetalleSolicitud() {
     }
   }
 
+  async function rechazar(propuesta) {
+    const quien = `${propuesta.trabajadorNombre} ${propuesta.trabajadorApellido}`.trim()
+    if (
+      !window.confirm(
+        `¿Rechazar la propuesta de ${quien} por ${formatearPesos(propuesta.presupuesto)}?`,
+      )
+    ) {
+      return
+    }
+    try {
+      setProcesando(true)
+      await contratacionesRepo.rechazarPropuesta(propuesta.id)
+      mostrar('Propuesta rechazada.', 'info')
+      await recargar()
+    } catch (err) {
+      mostrar(mensajeError(err), 'error')
+    } finally {
+      setProcesando(false)
+    }
+  }
+
   async function recargar() {
     const [sol, props] = await Promise.all([
       solicitudesRepo.obtener(id),
@@ -109,6 +130,13 @@ export default function DetalleSolicitud() {
       </Card>
     )
   }
+
+  const propuestaPendiente = propuestas.find((p) => p.estado === 'enviada')
+  const esPersonal = Boolean(solicitud.trabajadorDestinoId)
+  const superaPresupuesto =
+    Boolean(propuestaPendiente) &&
+    solicitud.presupuestoMax != null &&
+    Number(propuestaPendiente.presupuesto) > Number(solicitud.presupuestoMax)
 
   return (
     <div className="mx-auto max-w-3xl space-y-5">
@@ -165,6 +193,70 @@ export default function DetalleSolicitud() {
           </div>
         )}
       </Card>
+
+      {esPersonal && propuestaPendiente && solicitud.estado === 'abierta' && (
+        <Card className="border-primary/40 bg-primary-soft">
+          <p className="font-bold text-ink">
+            {propuestaPendiente.trabajadorNombre} {propuestaPendiente.trabajadorApellido} aceptó
+            tu solicitud
+          </p>
+          <p className="mt-1 text-sm text-muted">
+            Propuso {formatearPesos(propuestaPendiente.presupuesto)}. Confirmá o rechazá su
+            propuesta para continuar.
+          </p>
+          {superaPresupuesto && (
+            <p className="mt-2 rounded-xl bg-amber-50 px-3 py-2 text-xs font-semibold text-warning">
+              ⚠ Supera tu presupuesto máximo de {formatearPesos(solicitud.presupuestoMax)}.
+            </p>
+          )}
+
+          {aceptando === propuestaPendiente.id ? (
+            <div className="mt-3 rounded-xl bg-surface p-3">
+              <p className="text-sm font-semibold text-ink">
+                ¿Confirmar la contratación por {formatearPesos(propuestaPendiente.presupuesto)}?
+              </p>
+              <p className="mt-1 text-xs text-muted">
+                Se rechazarán automáticamente las demás propuestas.
+              </p>
+              <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+                <Button
+                  className="w-full sm:w-auto"
+                  onClick={() => aceptar(propuestaPendiente)}
+                  disabled={procesando}
+                >
+                  {procesando ? 'Confirmando…' : 'Confirmar'}
+                </Button>
+                <Button
+                  variante="outline"
+                  className="w-full sm:w-auto"
+                  onClick={() => setAceptando(null)}
+                  disabled={procesando}
+                >
+                  Cancelar
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+              <Button
+                className="w-full sm:w-auto"
+                onClick={() => setAceptando(propuestaPendiente.id)}
+                disabled={procesando}
+              >
+                Confirmar presupuesto
+              </Button>
+              <Button
+                variante="outline"
+                className="w-full sm:w-auto"
+                onClick={() => rechazar(propuestaPendiente)}
+                disabled={procesando}
+              >
+                Rechazar
+              </Button>
+            </div>
+          )}
+        </Card>
+      )}
 
       {contratacion && (
         <Card className="border-primary/30 bg-primary-soft">
@@ -238,7 +330,7 @@ export default function DetalleSolicitud() {
                   </p>
                 )}
 
-                {solicitud.estado === 'abierta' && p.estado === 'enviada' && (
+                {solicitud.estado === 'abierta' && p.estado === 'enviada' && !esPersonal && (
                   <div className="mt-3">
                     {aceptando === p.id ? (
                       <div className="rounded-xl bg-primary-soft p-3">
@@ -267,13 +359,22 @@ export default function DetalleSolicitud() {
                         </div>
                       </div>
                     ) : (
-                      <Button
-                        variante="outline"
-                        className="w-full sm:w-auto"
-                        onClick={() => setAceptando(p.id)}
-                      >
-                        Aceptar propuesta
-                      </Button>
+                      <div className="flex flex-col gap-2 sm:flex-row">
+                        <Button
+                          className="w-full sm:w-auto"
+                          onClick={() => setAceptando(p.id)}
+                        >
+                          Aceptar propuesta
+                        </Button>
+                        <Button
+                          variante="outline"
+                          className="w-full sm:w-auto"
+                          onClick={() => rechazar(p)}
+                          disabled={procesando}
+                        >
+                          Rechazar
+                        </Button>
+                      </div>
                     )}
                   </div>
                 )}

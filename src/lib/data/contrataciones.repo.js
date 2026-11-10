@@ -86,6 +86,14 @@ export async function aceptar(propuestaId) {
   return data
 }
 
+/** El cliente rechaza una propuesta enviada (en personales cierra la solicitud). */
+export async function rechazarPropuesta(propuestaId) {
+  const { error } = await supabase.rpc('rechazar_propuesta', {
+    p_propuesta_id: propuestaId,
+  })
+  if (error) throw error
+}
+
 async function subirFotos(usuarioId, contratacionId, fotos = []) {
   const paths = []
   for (const foto of fotos) {

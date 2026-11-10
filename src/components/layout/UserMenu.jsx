@@ -19,7 +19,7 @@ function Chevron() {
       strokeWidth="2"
       strokeLinecap="round"
       strokeLinejoin="round"
-      className="h-4 w-4 text-muted"
+      className="h-4 w-4 text-white/70"
       aria-hidden="true"
     >
       <path d="m6 9 6 6 6-6" />
@@ -48,12 +48,12 @@ export default function UserMenu() {
       <button
         type="button"
         onClick={() => setAbierto((v) => !v)}
-        className="flex items-center gap-2 rounded-full p-1 transition hover:bg-canvas"
+        className="flex items-center gap-2 rounded-full p-1 transition hover:bg-white/10"
         aria-haspopup="menu"
         aria-expanded={abierto}
       >
-        <Avatar usuario={usuario} tamano="md" />
-        <span className="hidden max-w-[9rem] truncate text-sm font-bold text-ink sm:block">
+        <Avatar usuario={usuario} tamano="md" className="ring-2 ring-white/40" />
+        <span className="hidden max-w-[9rem] truncate text-sm font-bold text-white sm:block">
           {usuario?.nombre}
         </span>
         <span className="hidden sm:block">

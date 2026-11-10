@@ -32,8 +32,13 @@ const MENSAJES = {
   estado_invalido: 'La acción no es válida en el estado actual.',
   propuesta_no_encontrada: 'La propuesta no existe.',
   propuesta_no_disponible: 'La propuesta ya no está disponible.',
+  propuesta_ya_enviada: 'Ya enviaste tu presupuesto a esta solicitud.',
+  sin_permiso: 'No tenés permiso para realizar esa acción.',
   no_es_solicitud_personal: 'Esta solicitud no es una solicitud personal.',
   destino_invalido: 'Ese profesional no está disponible para recibir solicitudes.',
+  oficio_no_disponible: 'Ese oficio no está entre los que ofrece el profesional.',
+  profesional_no_disponible:
+    'Ese profesional está suspendido y no puede recibir contrataciones por ahora.',
 }
 
 const MENSAJES_SUPABASE = {
@@ -81,8 +86,12 @@ export function mensajeError(error) {
   if (/estado_invalido/i.test(codigo)) return MENSAJES.estado_invalido
   if (/propuesta_no_encontrada/i.test(codigo)) return MENSAJES.propuesta_no_encontrada
   if (/propuesta_no_disponible/i.test(codigo)) return MENSAJES.propuesta_no_disponible
+  if (/propuesta_ya_enviada/i.test(codigo)) return MENSAJES.propuesta_ya_enviada
+  if (/sin_permiso/i.test(codigo)) return MENSAJES.sin_permiso
   if (/no_es_solicitud_personal/i.test(codigo)) return MENSAJES.no_es_solicitud_personal
   if (/destino_invalido/i.test(codigo)) return MENSAJES.destino_invalido
+  if (/oficio_no_disponible/i.test(codigo)) return MENSAJES.oficio_no_disponible
+  if (/profesional_no_disponible/i.test(codigo)) return MENSAJES.profesional_no_disponible
 
   if (/propuestas_solicitud_id_trabajador_id_key/i.test(codigo)) {
     return 'Ya enviaste una propuesta a esta solicitud.'

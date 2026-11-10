@@ -31,7 +31,7 @@ function Logo() {
         draggable="false"
         className="h-9 w-9 select-none object-contain"
       />
-      <span className="text-lg font-extrabold text-[#133864]">ChangAr</span>
+      <span className="text-lg font-extrabold text-white">ChangAr</span>
     </div>
   )
 }
@@ -138,7 +138,7 @@ export default function AppLayout() {
   return (
     <div className={`min-h-screen bg-canvas ${tema}`.trim()}>
       {/* Header: presente en mobile y desktop, con el nombre de la app */}
-      <header className="sticky top-0 z-30 border-b border-line bg-surface/90 backdrop-blur">
+      <header className="sticky top-0 z-30 border-b border-white/10 bg-primary-dark text-white shadow-sm">
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-4 px-5 lg:px-8">
           <Link to={inicio} aria-label="Inicio de ChangAr">
             <Logo />
@@ -147,7 +147,7 @@ export default function AppLayout() {
           <div className="flex items-center gap-2">
             <Link
               to="/notificaciones"
-              className="relative flex h-10 w-10 items-center justify-center rounded-full bg-primary-soft text-primary transition hover:brightness-95"
+              className="relative flex h-10 w-10 items-center justify-center rounded-full bg-white/15 text-white transition hover:bg-white/25"
               aria-label="Notificaciones"
             >
               <svg
@@ -162,7 +162,7 @@ export default function AppLayout() {
                 <path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9M13.7 21a2 2 0 0 1-3.4 0" />
               </svg>
               {noLeidas > 0 && (
-                <span className="absolute -right-0.5 -top-0.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-danger px-1 text-[11px] font-bold text-white">
+                <span className="absolute -right-0.5 -top-0.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-danger px-1 text-[11px] font-bold text-white ring-2 ring-primary-dark">
                   {noLeidas}
                 </span>
               )}
