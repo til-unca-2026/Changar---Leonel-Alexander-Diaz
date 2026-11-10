@@ -63,7 +63,7 @@ export default function Dashboard() {
             <section>
               <div className="mb-3 flex items-center justify-between">
                 <h2 className="text-lg font-bold">En curso / requiere acción</h2>
-                <Link to="/cliente/contrataciones" className="text-sm font-bold text-primary">
+                <Link to="/cliente/contrataciones" className="text-sm font-bold text-link">
                   Ver todas
                 </Link>
               </div>
@@ -80,7 +80,7 @@ export default function Dashboard() {
             <div className="mb-3 flex items-center justify-between">
               <h2 className="text-lg font-bold">Tus solicitudes</h2>
               {solicitudes.length > 0 && (
-                <Link to="/cliente/solicitudes" className="text-sm font-bold text-primary">
+                <Link to="/cliente/solicitudes" className="text-sm font-bold text-link">
                   Ver todas
                 </Link>
               )}

@@ -104,7 +104,7 @@ export default function Explorar() {
 
                 <Link
                   to={`/perfiles/${u.id}`}
-                  className="mt-3 block text-sm font-bold text-primary"
+                  className="mt-3 block text-sm font-bold text-link"
                 >
                   Ver perfil público →
                 </Link>

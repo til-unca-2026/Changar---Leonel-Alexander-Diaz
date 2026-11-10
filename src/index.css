@@ -4,11 +4,18 @@
  * Tokens de diseño de ChangAr, extraídos de los mockups.
  * Tailwind v4 genera utilidades a partir de estas variables
  * (ej: --color-primary -> bg-primary / text-primary / border-primary).
+ *
+ * Temas por rol (sobrescriben --color-primary en el subárbol autenticado):
+ * - Trabajador: azul (default)
+ * - Cliente: verde (mismo grado 600)
+ * - Admin: naranja (mismo grado 600)
  */
 @theme {
   --color-primary: #2563eb;
   --color-primary-dark: #1d4ed8;
   --color-primary-soft: #eff6ff;
+  /* Azul fijo para links sobre fondo blanco/canvas, independiente del rol. */
+  --color-link: #2563eb;
 
   --color-ink: #0f172a;
   --color-muted: #64748b;
@@ -24,6 +31,18 @@
   --font-sans: 'Plus Jakarta Sans', 'Inter', ui-sans-serif, system-ui, sans-serif;
 
   --radius-card: 1.25rem;
+}
+
+.tema-cliente {
+  --color-primary: #16a34a;
+  --color-primary-dark: #15803d;
+  --color-primary-soft: #f0fdf4;
+}
+
+.tema-admin {
+  --color-primary: #7c3aed;
+  --color-primary-dark: #6d28d9;
+  --color-primary-soft: #f5f3ff;
 }
 
 @layer base {

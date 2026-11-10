@@ -198,7 +198,7 @@ export default function NuevaSolicitud() {
   return (
     <div className="space-y-5">
       <div className="flex items-center gap-3">
-        <Link to="/cliente" className="font-bold text-primary">
+        <Link to="/cliente" className="font-bold text-link">
           ←
         </Link>
         <h1 className="text-2xl font-extrabold lg:text-3xl">

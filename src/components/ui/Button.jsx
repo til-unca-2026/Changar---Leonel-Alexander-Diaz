@@ -1,6 +1,6 @@
 const VARIANTES = {
   primary: 'bg-primary text-white hover:bg-primary-dark active:bg-primary-dark',
-  soft: 'bg-primary-soft text-primary hover:bg-blue-100',
+  soft: 'bg-primary-soft text-primary hover:brightness-95',
   outline: 'border border-line bg-surface text-ink hover:bg-canvas',
   ghost: 'text-primary hover:bg-primary-soft',
   danger: 'bg-danger text-white hover:opacity-90',

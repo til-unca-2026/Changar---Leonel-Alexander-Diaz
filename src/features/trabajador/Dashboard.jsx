@@ -111,7 +111,7 @@ export default function Dashboard() {
             <section>
               <div className="mb-3 flex items-center justify-between">
                 <h2 className="text-lg font-bold">Contrataciones en curso</h2>
-                <Link to="/trabajador/contrataciones" className="text-sm font-bold text-primary">
+                <Link to="/trabajador/contrataciones" className="text-sm font-bold text-link">
                   Ver todas
                 </Link>
               </div>
@@ -127,7 +127,7 @@ export default function Dashboard() {
             <div className="mb-3 flex items-center justify-between">
               <h2 className="text-lg font-bold">Mis propuestas</h2>
               {propuestas.length > 0 && (
-                <Link to="/trabajador/propuestas" className="text-sm font-bold text-primary">
+                <Link to="/trabajador/propuestas" className="text-sm font-bold text-link">
                   Ver todas
                 </Link>
               )}
