@@ -29,7 +29,13 @@ export default function MisSolicitudes() {
 
   const activas = contrataciones.filter((c) => ACTIVOS.includes(c.estado))
 
+  const requiereConfirmacion = (s) =>
+    s.estado === 'abierta' && Boolean(s.trabajadorDestinoId) && s.propuestaPendiente
+
   const ordenadas = [...solicitudes].sort((a, b) => {
+    const ca = requiereConfirmacion(a) ? 1 : 0
+    const cb = requiereConfirmacion(b) ? 1 : 0
+    if (ca !== cb) return cb - ca
     const pa = a.propuestasCount > 0 ? 1 : 0
     const pb = b.propuestasCount > 0 ? 1 : 0
     if (pa !== pb) return pb - pa

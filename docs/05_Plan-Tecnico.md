@@ -31,6 +31,8 @@ sin tiendas de apps. Acceso por URL, diseño responsive mobile-first.
 | 14 | El panel del admin muestra **métricas completas**: totales, tendencia 30 días, top de oficios y cola de pendientes | RPC `admin_metricas` |
 | 15 | El **fin de servicio requiere doble validación** (cliente y trabajador). La **cancelación es unilateral**. En ambos casos ambas partes pueden aportar texto y fotos de evidencia | RPCs `confirmar_fin`, `cancelar_contratacion`, `agregar_respuesta` |
 | 16 | La solicitud se **previsualiza y se puede editar entero** antes de confirmar la publicación. Una vez publicada no se edita | Pantalla nueva-solicitud (paso de preview) |
+| 17 | En las **solicitudes personales**, aceptar equivale a **enviar una propuesta con el precio del trabajador**: el cliente debe **confirmarla o rechazarla** antes de que se cree la contratación. Rechazarla cierra la solicitud. Un precio mayor al `presupuesto_max` se permite con aviso | RPCs `aceptar_solicitud_personal`, `rechazar_propuesta` |
+| 18 | **Sanciones con visibilidad:** la suspensión temporal (`baneado_hasta` futuro) **oculta sin cambiar de estado** las propuestas `enviada` del sancionado y las solicitudes `abierta` del cliente sancionado; el trabajador suspendido sigue en Explorar con aviso y sin poder recibir solicitudes. El bloqueo permanente (`activo = false`) lo saca de todos los listados y rechaza las personales pendientes | `buscar_trabajadores`, `tg_validar_solicitud_personal`, `aceptar_propuesta`, `admin_banear` |
 
 > **Consecuencia de la decisión 5:** como los trabajadores nuevos arrancan con 0 reseñas y la
 > reputación es la única señal de confianza, el perfil debe mostrar un badge **"Nuevo"** en
@@ -1308,6 +1310,12 @@ VALORACIÓN
   Function. El chequeo de `activo` en el front complementa, pero el corte real lo hace el
   ban, que también frena llamadas directas a la API con sesión válida.
 - `admin_asignar_rol` es el único camino para crear administradores.
+- **Sanciones y visibilidad (decisión 18):** la suspensión temporal (`baneado_hasta`
+  futuro, `activo = true`) no cambia estados: se **ocultan** las propuestas `enviada` del
+  sancionado y las solicitudes `abierta` del cliente sancionado, y el trabajador sigue en
+  Explorar con el aviso "Cuenta suspendida" y sin botón para enviar solicitud. El bloqueo
+  permanente (`activo = false`) desaparece de todos los listados y, al aplicarse, rechaza
+  las solicitudes personales dirigidas a esa cuenta.
 - **Oficios:** el admin aprueba o rechaza los pendientes y fusiona duplicados.
 - **Reportes:** el admin los lista por estado y puede resolverlos o descartarlos.
 - **Métricas:** totales por rol y estado, tendencia de 30 días, top de oficios y cola de

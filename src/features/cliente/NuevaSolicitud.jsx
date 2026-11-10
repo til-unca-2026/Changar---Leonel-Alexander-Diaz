@@ -6,6 +6,7 @@ import { useToast } from '@/components/ui/Toast.jsx'
 import * as solicitudesRepo from '@/lib/data/solicitudes.repo.js'
 import * as perfilClienteRepo from '@/lib/data/perfilCliente.repo.js'
 import * as perfilesRepo from '@/lib/data/perfiles.repo.js'
+import { mensajeError } from '@/lib/errores.js'
 import { formatearPesos } from '@/lib/format.js'
 import Avatar from '@/components/ui/Avatar.jsx'
 import Button from '@/components/ui/Button.jsx'
@@ -77,6 +78,7 @@ export default function NuevaSolicitud() {
   const navigate = useNavigate()
   const [params] = useSearchParams()
   const trabajadorParam = params.get('trabajador')
+  const oficioParam = params.get('oficio')
 
   const [paso, setPaso] = useState('form')
   const [form, setForm] = useState(VACIO)
@@ -84,8 +86,12 @@ export default function NuevaSolicitud() {
   const [error, setError] = useState('')
   const [enviando, setEnviando] = useState(false)
   const [destino, setDestino] = useState(null)
+  const [oficiosDestino, setOficiosDestino] = useState([])
+  const [cargandoDestino, setCargandoDestino] = useState(Boolean(trabajadorParam))
 
-  const nombreOficio = oficios.find((o) => o.id === form.oficioId)?.nombre ?? ''
+  const esPersonal = Boolean(trabajadorParam)
+  const opciones = esPersonal ? oficiosDestino : oficios
+  const nombreOficio = opciones.find((o) => o.id === form.oficioId)?.nombre ?? ''
 
   // Precarga la ubicación con la zona declarada en el perfil del cliente.
   useEffect(() => {
@@ -105,9 +111,12 @@ export default function NuevaSolicitud() {
   useEffect(() => {
     if (!trabajadorParam) {
       setDestino(null)
+      setOficiosDestino([])
+      setCargandoDestino(false)
       return undefined
     }
     let activo = true
+    setCargandoDestino(true)
     Promise.all([
       perfilesRepo.obtenerTrabajador(trabajadorParam),
       perfilesRepo.oficiosDe(trabajadorParam),
@@ -115,16 +124,19 @@ export default function NuevaSolicitud() {
       .then(([perfil, oficiosTrabajador]) => {
         if (!activo) return
         setDestino(perfil)
-        const primero = oficiosTrabajador[0]?.id
-        if (primero) {
-          setForm((f) => (f.oficioId ? f : { ...f, oficioId: primero }))
+        setOficiosDestino(oficiosTrabajador)
+        const elegido =
+          oficiosTrabajador.find((o) => o.id === oficioParam)?.id ?? oficiosTrabajador[0]?.id
+        if (elegido) {
+          setForm((f) => (f.oficioId ? f : { ...f, oficioId: elegido }))
         }
       })
       .catch(() => {})
+      .finally(() => activo && setCargandoDestino(false))
     return () => {
       activo = false
     }
-  }, [trabajadorParam])
+  }, [trabajadorParam, oficioParam])
 
   function campo(nombre) {
     return (e) => setForm((f) => ({ ...f, [nombre]: e.target.value }))
@@ -160,11 +172,27 @@ export default function NuevaSolicitud() {
         'exito',
       )
       navigate('/cliente/solicitudes', { replace: true })
-    } catch {
-      setError('No pudimos publicar la solicitud. Intentá de nuevo.')
+    } catch (err) {
+      setError(mensajeError(err))
     } finally {
       setEnviando(false)
     }
+  }
+
+  if (esPersonal && !cargandoDestino && destino?.id && !destino.habilitado) {
+    return (
+      <div className="mx-auto max-w-2xl">
+        <Card className="py-10 text-center">
+          <p className="font-bold text-ink">Este profesional no está disponible</p>
+          <p className="mt-1 text-sm text-muted">
+            Tiene la cuenta suspendida, así que no puede recibir solicitudes por ahora.
+          </p>
+          <Link to="/cliente/explorar" className="mt-4 inline-block font-bold text-link">
+            Volver a explorar
+          </Link>
+        </Card>
+      </div>
+    )
   }
 
   if (paso === 'preview') {
@@ -225,14 +253,36 @@ export default function NuevaSolicitud() {
 
       <div className="grid gap-6 lg:grid-cols-2 lg:items-start">
         <form onSubmit={irAPreview} className="space-y-4">
-          <Select label="¿Qué servicio necesitás?" name="oficioId" value={form.oficioId} onChange={campo('oficioId')}>
-            <option value="">Elegí un oficio</option>
-            {oficios.map((o) => (
-              <option key={o.id} value={o.id}>
-                {o.nombre}
-              </option>
-            ))}
-          </Select>
+          <div>
+            <Select
+              label="¿Qué servicio necesitás?"
+              name="oficioId"
+              value={form.oficioId}
+              onChange={campo('oficioId')}
+            >
+              <option value="">Elegí un oficio</option>
+              {opciones.map((o) => (
+                <option key={o.id} value={o.id}>
+                  {o.nombre}
+                </option>
+              ))}
+            </Select>
+            {esPersonal && (
+              <p
+                className={`mt-1.5 text-xs ${
+                  !cargandoDestino && oficiosDestino.length === 0
+                    ? 'font-semibold text-danger'
+                    : 'text-muted'
+                }`}
+              >
+                {cargandoDestino
+                  ? 'Cargando los oficios del profesional…'
+                  : oficiosDestino.length === 0
+                    ? 'Este profesional no tiene oficios activos cargados.'
+                    : `Solo se muestran los oficios que ofrece ${destino?.nombre ?? 'el profesional'}.`}
+              </p>
+            )}
+          </div>
 
           <Input
             label="Título"
@@ -276,7 +326,11 @@ export default function NuevaSolicitud() {
 
           {error && <p className="text-sm font-semibold text-danger">{error}</p>}
 
-          <Button tipo="submit" className="w-full sm:w-auto">
+          <Button
+            tipo="submit"
+            className="w-full sm:w-auto"
+            disabled={esPersonal && !cargandoDestino && oficiosDestino.length === 0}
+          >
             Previsualizar
           </Button>
         </form>

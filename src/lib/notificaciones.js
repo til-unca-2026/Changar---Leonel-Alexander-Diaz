@@ -1,4 +1,6 @@
 const ETIQUETAS = {
+  solicitud_personal: 'Recibiste una solicitud personal',
+  solicitud_rechazada: 'El trabajador rechazó tu solicitud',
   nueva_propuesta: 'Recibiste una nueva propuesta',
   propuesta_aceptada: 'Tu propuesta fue aceptada',
   propuesta_rechazada: 'Tu propuesta fue rechazada',
@@ -27,6 +29,10 @@ export function destino(tipo, ref, rol) {
   const base = rol === 'cliente' ? '/cliente' : rol === 'trabajador' ? '/trabajador' : '/admin'
 
   switch (tipo) {
+    case 'solicitud_personal':
+      return `/trabajador/solicitudes/${ref}`
+    case 'solicitud_rechazada':
+      return `/cliente/solicitudes/${ref}`
     case 'nueva_propuesta':
       return `/cliente/solicitudes/${ref}`
     case 'propuesta_aceptada':

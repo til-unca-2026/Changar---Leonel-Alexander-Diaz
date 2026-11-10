@@ -32,8 +32,9 @@ un sistema de reputación basado en trabajos realizados y valoraciones.
 - **Notificaciones in-app**: avisos por propuestas, contrataciones, valoraciones, oficios y
   reportes, con centro de notificaciones y badge en el header.
 - **Exploración de perfiles y solicitudes personales**: el cliente busca trabajadores con
-  perfil completo (por texto, oficio, zona y reputación) y les envía una solicitud directa,
-  que el trabajador acepta (fijando su presupuesto) o rechaza.
+  perfil completo (por texto, oficio, zona y reputación) y les envía una solicitud directa.
+  El trabajador la acepta enviando su presupuesto o la rechaza; si la acepta, el cliente debe
+  confirmar o rechazar ese presupuesto antes de que se cree la contratación.
 - **Próxima etapa**: Realtime (opcional), despliegue y documentación.
 
 ## Configuración

@@ -36,6 +36,9 @@ export default function DetalleSolicitud() {
   const [editPresupuesto, setEditPresupuesto] = useState('')
   const [editError, setEditError] = useState('')
   const [accionando, setAccionando] = useState(false)
+  const [presupuestoPersonal, setPresupuestoPersonal] = useState('')
+  const [errorPersonal, setErrorPersonal] = useState('')
+  const [procesandoPersonal, setProcesandoPersonal] = useState(false)
 
   useEffect(() => {
     let activo = true
@@ -49,6 +52,9 @@ export default function DetalleSolicitud() {
         setSolicitud(sol)
         setPerfil(p)
         setMiPropuesta(prop)
+        if (sol.trabajadorDestinoId === usuario.id && sol.presupuestoMax != null) {
+          setPresupuestoPersonal(String(sol.presupuestoMax))
+        }
         if (prop?.estado === 'aceptada') {
           const c = await contratacionesRepo.obtenerPorPropuesta(prop.id)
           if (activo) setContratacion(c)
@@ -151,6 +157,41 @@ export default function DetalleSolicitud() {
     }
   }
 
+  async function aceptarPersonal() {
+    setErrorPersonal('')
+    if (!presupuestoPersonal || Number(presupuestoPersonal) <= 0) {
+      setErrorPersonal('Ingresá tu presupuesto.')
+      return
+    }
+    try {
+      setProcesandoPersonal(true)
+      await solicitudesRepo.aceptarPersonal(id, Number(presupuestoPersonal))
+      mostrar(
+        'Le enviamos tu presupuesto al cliente. Esperando su confirmación.',
+        'exito',
+      )
+      await recargar()
+    } catch (err) {
+      setErrorPersonal(mensajeError(err))
+    } finally {
+      setProcesandoPersonal(false)
+    }
+  }
+
+  async function rechazarPersonal() {
+    if (!window.confirm('¿Rechazar esta solicitud?')) return
+    try {
+      setProcesandoPersonal(true)
+      await solicitudesRepo.rechazarPersonal(id)
+      mostrar('Solicitud rechazada.', 'info')
+      await recargar()
+    } catch (err) {
+      mostrar(mensajeError(err), 'error')
+    } finally {
+      setProcesandoPersonal(false)
+    }
+  }
+
   if (cargando) {
     return (
       <div className="flex justify-center py-16 text-primary">
@@ -174,10 +215,30 @@ export default function DetalleSolicitud() {
     )
   }
 
+  if (!solicitud.clienteHabilitado) {
+    return (
+      <Card className="mx-auto max-w-3xl py-10 text-center">
+        <p className="font-bold text-ink">Esta solicitud no está disponible</p>
+        <p className="mt-1 text-sm text-muted">
+          El cliente tiene la cuenta suspendida. Volvé a intentar cuando se levante la sanción.
+        </p>
+        <Link to="/trabajador" className="mt-3 inline-block font-bold text-link">
+          Volver al panel
+        </Link>
+      </Card>
+    )
+  }
+
+  const esPersonal =
+    Boolean(solicitud.trabajadorDestinoId) && solicitud.trabajadorDestinoId === usuario.id
+
   return (
     <div className="mx-auto max-w-3xl space-y-5">
       <div className="flex items-center gap-3">
-        <Link to="/trabajador/explorar" className="font-bold text-link">
+        <Link
+          to={esPersonal ? '/trabajador' : '/trabajador/explorar'}
+          className="font-bold text-link"
+        >
           ←
         </Link>
         <h1 className="text-2xl font-extrabold">Detalle de la solicitud</h1>
@@ -223,7 +284,9 @@ export default function DetalleSolicitud() {
             <h2 className="font-bold text-ink">
               {miPropuesta.estado === 'retirada'
                 ? 'Propuesta retirada'
-                : 'Ya enviaste una propuesta'}
+                : esPersonal && miPropuesta.estado === 'enviada'
+                  ? 'Esperando confirmación del cliente'
+                  : 'Ya enviaste una propuesta'}
             </h2>
             <Badge estado={miPropuesta.estado} />
           </div>
@@ -266,6 +329,11 @@ export default function DetalleSolicitud() {
               <p className="mt-1 text-xs text-muted">
                 Enviada {fechaRelativa(miPropuesta.created_at).toLowerCase()}
               </p>
+              {esPersonal && miPropuesta.estado === 'enviada' && (
+                <p className="mt-1 text-xs font-semibold text-muted">
+                  El cliente debe confirmar tu presupuesto para que se cree la contratación.
+                </p>
+              )}
 
               {miPropuesta.estado === 'enviada' && (
                 <div className="mt-3 flex flex-wrap gap-2">
@@ -314,6 +382,49 @@ export default function DetalleSolicitud() {
               Completar perfil
             </Button>
           </Link>
+        </Card>
+      ) : esPersonal ? (
+        <Card>
+          <h2 className="font-bold">Aceptar la solicitud</h2>
+          <p className="mt-1 text-sm text-muted">
+            El cliente te envió esta solicitud directamente. Indicá tu presupuesto: va a poder
+            confirmarlo o rechazarlo antes de que se cree la contratación.
+          </p>
+          <div className="mt-4 space-y-4">
+            <Input
+              label="Tu presupuesto"
+              type="number"
+              min="0"
+              value={presupuestoPersonal}
+              onChange={(e) => setPresupuestoPersonal(e.target.value)}
+              placeholder={solicitud.presupuestoMax ? String(solicitud.presupuestoMax) : 'Ej: 15000'}
+            />
+            {Number(presupuestoPersonal) > 0 &&
+              solicitud.presupuestoMax != null &&
+              Number(presupuestoPersonal) > Number(solicitud.presupuestoMax) && (
+                <p className="rounded-xl bg-amber-50 px-3 py-2 text-sm font-semibold text-warning">
+                  Tu presupuesto supera el máximo que indicó el cliente. Igual podés enviarlo.
+                </p>
+              )}
+            {errorPersonal && <p className="text-sm font-semibold text-danger">{errorPersonal}</p>}
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <Button
+                className="w-full sm:w-auto"
+                onClick={aceptarPersonal}
+                disabled={procesandoPersonal}
+              >
+                {procesandoPersonal ? 'Enviando…' : 'Enviar presupuesto'}
+              </Button>
+              <Button
+                variante="outline"
+                className="w-full sm:w-auto"
+                onClick={rechazarPersonal}
+                disabled={procesandoPersonal}
+              >
+                Rechazar solicitud
+              </Button>
+            </div>
+          </div>
         </Card>
       ) : (
         <Card>
