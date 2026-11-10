@@ -151,7 +151,7 @@ export async function canceladosDe(perfilId) {
   }))
 }
 
-/** Miniaturas del portfolio de un trabajador (hasta 3) para listados. */
+/** Miniatura del portfolio de un trabajador (hasta 3) para listados. */
 export async function portfolioMini(trabajadorId) {
   const { data, error } = await supabase
     .from('portfolio_fotos')
@@ -161,4 +161,42 @@ export async function portfolioMini(trabajadorId) {
     .limit(3)
   if (error) throw error
   return (data ?? []).map((p) => urlPublica('portfolio-fotos', p.storage_path))
+}
+
+/** Oficios activos declarados por un trabajador. */
+export async function oficiosDe(trabajadorId) {
+  const { data, error } = await supabase
+    .from('trabajador_oficios')
+    .select('oficio_id, oficios(nombre, estado)')
+    .eq('trabajador_id', trabajadorId)
+  if (error) throw error
+  return (data ?? [])
+    .filter((r) => r.oficios?.estado === 'activo')
+    .map((r) => ({ id: r.oficio_id, nombre: r.oficios.nombre }))
+}
+
+/** Busca trabajadores con perfil completo, por texto, oficio, zona y reputación. */
+export async function buscarTrabajadores({ query, oficioId, zona, minRating } = {}) {
+  const { data, error } = await supabase.rpc('buscar_trabajadores', {
+    p_query: query?.trim() || null,
+    p_oficio_id: oficioId || null,
+    p_zona: zona?.trim() || null,
+    p_min_rating: minRating || 0,
+  })
+  if (error) throw error
+
+  return (data ?? []).map((p) => ({
+    id: p.id,
+    nombre: p.nombre,
+    apellido: p.apellido,
+    avatarUrl: p.avatar_path ? urlPublica('avatares', p.avatar_path) : null,
+    zona: p.zona ?? '',
+    descripcion: p.descripcion ?? '',
+    experiencia: p.experiencia ?? '',
+    oficios: p.oficios ?? [],
+    totalValoraciones: p.total_valoraciones ?? 0,
+    promedio: p.promedio ?? 0,
+    bajas: p.bajas ?? 0,
+    reportes: p.reportes ?? 0,
+  }))
 }

@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '@/context/AuthContext.jsx'
 import { useOficios } from '@/hooks/useSolicitudes.js'
 import { useToast } from '@/components/ui/Toast.jsx'
 import * as solicitudesRepo from '@/lib/data/solicitudes.repo.js'
 import * as perfilClienteRepo from '@/lib/data/perfilCliente.repo.js'
+import * as perfilesRepo from '@/lib/data/perfiles.repo.js'
 import { formatearPesos } from '@/lib/format.js'
+import Avatar from '@/components/ui/Avatar.jsx'
 import Button from '@/components/ui/Button.jsx'
 import Card from '@/components/ui/Card.jsx'
 import Input from '@/components/ui/Input.jsx'
@@ -73,12 +75,15 @@ export default function NuevaSolicitud() {
   const oficios = useOficios()
   const { mostrar } = useToast()
   const navigate = useNavigate()
+  const [params] = useSearchParams()
+  const trabajadorParam = params.get('trabajador')
 
   const [paso, setPaso] = useState('form')
   const [form, setForm] = useState(VACIO)
   const [fotos, setFotos] = useState([])
   const [error, setError] = useState('')
   const [enviando, setEnviando] = useState(false)
+  const [destino, setDestino] = useState(null)
 
   const nombreOficio = oficios.find((o) => o.id === form.oficioId)?.nombre ?? ''
 
@@ -95,6 +100,31 @@ export default function NuevaSolicitud() {
       activo = false
     }
   }, [usuario?.id, usuario?.rol])
+
+  // Si viene dirigido a un trabajador, lo cargamos y pre-seleccionamos su oficio.
+  useEffect(() => {
+    if (!trabajadorParam) {
+      setDestino(null)
+      return undefined
+    }
+    let activo = true
+    Promise.all([
+      perfilesRepo.obtenerTrabajador(trabajadorParam),
+      perfilesRepo.oficiosDe(trabajadorParam),
+    ])
+      .then(([perfil, oficiosTrabajador]) => {
+        if (!activo) return
+        setDestino(perfil)
+        const primero = oficiosTrabajador[0]?.id
+        if (primero) {
+          setForm((f) => (f.oficioId ? f : { ...f, oficioId: primero }))
+        }
+      })
+      .catch(() => {})
+    return () => {
+      activo = false
+    }
+  }, [trabajadorParam])
 
   function campo(nombre) {
     return (e) => setForm((f) => ({ ...f, [nombre]: e.target.value }))
@@ -123,8 +153,12 @@ export default function NuevaSolicitud() {
         ubicacion: form.ubicacion,
         presupuestoMax: form.presupuestoMax || null,
         fotos,
+        trabajadorDestinoId: destino?.id ?? null,
       })
-      mostrar('Solicitud publicada.', 'exito')
+      mostrar(
+        destino ? 'Solicitud enviada.' : 'Solicitud publicada.',
+        'exito',
+      )
       navigate('/cliente/solicitudes', { replace: true })
     } catch {
       setError('No pudimos publicar la solicitud. Intentá de nuevo.')
@@ -137,7 +171,7 @@ export default function NuevaSolicitud() {
     return (
       <div className="mx-auto max-w-2xl space-y-5">
         <div className="rounded-2xl bg-amber-50 px-4 py-3 text-sm font-semibold text-warning">
-          Previsualización — todavía no está publicada
+          Previsualización — {destino ? 'todavía no fue enviada' : 'todavía no está publicada'}
         </div>
 
         <TarjetaPreview nombreOficio={nombreOficio} form={form} fotos={fotos} />
@@ -164,11 +198,30 @@ export default function NuevaSolicitud() {
   return (
     <div className="space-y-5">
       <div className="flex items-center gap-3">
-        <Link to="/cliente" className="font-bold text-primary">
+        <Link to="/cliente" className="font-bold text-link">
           ←
         </Link>
-        <h1 className="text-2xl font-extrabold lg:text-3xl">Publicar solicitud</h1>
+        <h1 className="text-2xl font-extrabold lg:text-3xl">
+          {destino ? 'Enviar solicitud' : 'Publicar solicitud'}
+        </h1>
       </div>
+
+      {destino && (
+        <Card className="border-primary/30 bg-primary-soft">
+          <p className="text-xs font-semibold text-primary">Solicitud dirigida a</p>
+          <div className="mt-2 flex items-center gap-3">
+            <Avatar usuario={destino} tamano="md" />
+            <div className="min-w-0">
+              <p className="truncate font-bold text-ink">
+                {destino.nombre} {destino.apellido}
+              </p>
+              <p className="text-xs text-muted">
+                Solo {destino.nombre} va a recibir esta solicitud.
+              </p>
+            </div>
+          </div>
+        </Card>
+      )}
 
       <div className="grid gap-6 lg:grid-cols-2 lg:items-start">
         <form onSubmit={irAPreview} className="space-y-4">

@@ -100,7 +100,7 @@ export default function Registro() {
   }
 
   return (
-    <div className="mx-auto flex min-h-screen max-w-md flex-col px-6 pb-10 pt-12 lg:my-10 lg:min-h-0 lg:rounded-card lg:border lg:border-line lg:bg-surface lg:px-10 lg:py-10 lg:shadow-sm">
+    <div className="tema-admin mx-auto flex min-h-screen max-w-md flex-col px-6 pb-10 pt-12 lg:my-10 lg:min-h-0 lg:rounded-card lg:border lg:border-line lg:bg-surface lg:px-10 lg:py-10 lg:shadow-sm">
       <Logo />
       <p className="mt-2 text-center text-sm text-muted">
         Conectando trabajo de confianza en tu barrio
@@ -157,7 +157,7 @@ export default function Registro() {
 
       <p className="mt-6 text-center text-sm text-muted">
         ¿Ya tenés cuenta?{' '}
-        <Link to="/login" className="font-bold text-primary">
+        <Link to="/login" className="font-bold text-primary hover:text-primary-dark">
           Iniciá sesión
         </Link>
       </p>

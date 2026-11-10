@@ -237,7 +237,7 @@ export default function DetalleContratacion() {
     return (
       <Card className="py-10 text-center">
         <p className="font-bold text-ink">No encontramos la contratación</p>
-        <Link to={`${base}/contrataciones`} className="mt-3 inline-block font-bold text-primary">
+        <Link to={`${base}/contrataciones`} className="mt-3 inline-block font-bold text-link">
           Volver a contrataciones
         </Link>
       </Card>
@@ -258,7 +258,7 @@ export default function DetalleContratacion() {
   return (
     <div className="mx-auto max-w-3xl space-y-5">
       <div className="flex items-center gap-3">
-        <Link to={`${base}/contrataciones`} className="font-bold text-primary">
+        <Link to={`${base}/contrataciones`} className="font-bold text-link">
           ←
         </Link>
         <h1 className="text-2xl font-extrabold">Detalle de la contratación</h1>

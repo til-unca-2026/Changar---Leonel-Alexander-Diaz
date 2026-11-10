@@ -167,7 +167,7 @@ export default function DetalleSolicitud() {
     return (
       <Card className="py-10 text-center">
         <p className="font-bold text-ink">No encontramos la solicitud</p>
-        <Link to="/trabajador/explorar" className="mt-3 inline-block font-bold text-primary">
+        <Link to="/trabajador/explorar" className="mt-3 inline-block font-bold text-link">
           Volver al feed
         </Link>
       </Card>
@@ -177,7 +177,7 @@ export default function DetalleSolicitud() {
   return (
     <div className="mx-auto max-w-3xl space-y-5">
       <div className="flex items-center gap-3">
-        <Link to="/trabajador/explorar" className="font-bold text-primary">
+        <Link to="/trabajador/explorar" className="font-bold text-link">
           ←
         </Link>
         <h1 className="text-2xl font-extrabold">Detalle de la solicitud</h1>

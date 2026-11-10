@@ -24,20 +24,14 @@ function Icono({ d, className = 'h-6 w-6' }) {
 function Logo() {
   return (
     <div className="flex items-center gap-2">
-      <svg
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="#2563EB"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        className="h-6 w-6"
+      <img
+        src="/logo-mascota.png"
+        alt=""
         aria-hidden="true"
-      >
-        <path d="M14.7 6.3a4 4 0 0 0 5 5l-9.4 9.4a2.1 2.1 0 0 1-3-3z" />
-        <path d="M14.7 6.3 18 3l3 3-3.3 3.3" />
-      </svg>
-      <span className="text-lg font-extrabold text-primary">ChangAr</span>
+        draggable="false"
+        className="h-9 w-9 select-none object-contain"
+      />
+      <span className="text-lg font-extrabold text-[#133864]">ChangAr</span>
     </div>
   )
 }
@@ -67,6 +61,7 @@ const NAV_POR_ROL = {
       { a: '/cliente', icono: 'inicio', texto: 'Inicio' },
       { a: '/cliente/solicitudes', icono: 'solicitudes', texto: 'Solicitudes' },
       { a: '/cliente/solicitudes/nueva', icono: 'publicar', texto: 'Publicar' },
+      { a: '/cliente/explorar', icono: 'explorar', texto: 'Buscar profesional' },
       { a: '/cliente/contrataciones', icono: 'contrataciones', texto: 'Contrataciones' },
       { a: '/perfil', icono: 'perfil', texto: 'Mi cuenta' },
     ],
@@ -92,12 +87,14 @@ const NAV_POR_ROL = {
   admin: {
     mobile: [
       { a: '/admin', icono: 'inicio', texto: 'Panel' },
+      { a: '/admin/explorar', icono: 'explorar', texto: 'Explorar' },
       { a: '/admin/usuarios', icono: 'perfil', texto: 'Usuarios' },
       { a: '/admin/oficios', icono: 'oficios', texto: 'Oficios' },
       { a: '/admin/reportes', icono: 'reportes', texto: 'Reportes' },
     ],
     desktop: [
       { a: '/admin', icono: 'inicio', texto: 'Panel' },
+      { a: '/admin/explorar', icono: 'explorar', texto: 'Explorar' },
       { a: '/admin/usuarios', icono: 'perfil', texto: 'Usuarios' },
       { a: '/admin/oficios', icono: 'oficios', texto: 'Oficios' },
       { a: '/admin/reportes', icono: 'reportes', texto: 'Reportes' },
@@ -112,10 +109,17 @@ const INICIO_POR_ROL = {
   admin: '/admin',
 }
 
+const TEMA_POR_ROL = {
+  cliente: 'tema-cliente',
+  trabajador: '',
+  admin: 'tema-admin',
+}
+
 export default function AppLayout() {
   const { usuario } = useAuth()
   const nav = NAV_POR_ROL[usuario?.rol] ?? { mobile: [], desktop: [] }
   const inicio = INICIO_POR_ROL[usuario?.rol] ?? '/'
+  const tema = TEMA_POR_ROL[usuario?.rol] ?? ''
   const location = useLocation()
   const [noLeidas, setNoLeidas] = useState(0)
 
@@ -132,7 +136,7 @@ export default function AppLayout() {
   }, [usuario?.id, location.pathname])
 
   return (
-    <div className="min-h-screen bg-canvas">
+    <div className={`min-h-screen bg-canvas ${tema}`.trim()}>
       {/* Header: presente en mobile y desktop, con el nombre de la app */}
       <header className="sticky top-0 z-30 border-b border-line bg-surface/90 backdrop-blur">
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-4 px-5 lg:px-8">

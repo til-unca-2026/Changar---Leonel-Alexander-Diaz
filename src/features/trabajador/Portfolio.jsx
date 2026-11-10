@@ -74,7 +74,7 @@ export default function Portfolio() {
   return (
     <div className="space-y-5">
       <div className="flex items-center gap-3">
-        <Link to="/trabajador/perfil" className="font-bold text-primary">
+        <Link to="/trabajador/perfil" className="font-bold text-link">
           ←
         </Link>
         <h1 className="text-2xl font-extrabold">Mi portfolio</h1>

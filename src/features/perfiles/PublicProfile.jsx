@@ -133,7 +133,7 @@ export default function PublicProfile() {
     return (
       <Card className="py-10 text-center">
         <p className="font-bold text-ink">No encontramos este perfil</p>
-        <Link to="/" className="mt-3 inline-block font-bold text-primary">
+        <Link to="/" className="mt-3 inline-block font-bold text-link">
           Volver al inicio
         </Link>
       </Card>

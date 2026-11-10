@@ -10,6 +10,7 @@ import Card from '@/components/ui/Card.jsx'
 import Spinner from '@/components/ui/Spinner.jsx'
 import TarjetaPropuesta from './TarjetaPropuesta.jsx'
 import TarjetaContratacion from '../contrataciones/TarjetaContratacion.jsx'
+import SolicitudesPersonales from './SolicitudesPersonales.jsx'
 
 const ACTIVOS = ['en_curso', 'pendiente_confirmacion', 'reportado']
 
@@ -66,6 +67,8 @@ export default function Dashboard() {
 
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="space-y-6 lg:col-span-2">
+          <SolicitudesPersonales />
+
           {completitud && (
             <Card>
               <div className="flex items-center justify-between">
@@ -108,7 +111,7 @@ export default function Dashboard() {
             <section>
               <div className="mb-3 flex items-center justify-between">
                 <h2 className="text-lg font-bold">Contrataciones en curso</h2>
-                <Link to="/trabajador/contrataciones" className="text-sm font-bold text-primary">
+                <Link to="/trabajador/contrataciones" className="text-sm font-bold text-link">
                   Ver todas
                 </Link>
               </div>
@@ -124,7 +127,7 @@ export default function Dashboard() {
             <div className="mb-3 flex items-center justify-between">
               <h2 className="text-lg font-bold">Mis propuestas</h2>
               {propuestas.length > 0 && (
-                <Link to="/trabajador/propuestas" className="text-sm font-bold text-primary">
+                <Link to="/trabajador/propuestas" className="text-sm font-bold text-link">
                   Ver todas
                 </Link>
               )}
