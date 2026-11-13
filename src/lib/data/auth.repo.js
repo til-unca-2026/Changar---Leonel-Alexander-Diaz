@@ -17,7 +17,7 @@ function componer(perfil, telefono, email) {
     apellido: perfil.apellido,
     email: email ?? null,
     telefono: telefono ?? '',
-    rol: perfil.rol,
+    rol: rolAuth === 'admin' ? 'admin' : perfil.rol,
     activo: perfil.activo,
     baneadoHasta: perfil.baneado_hasta ?? null,
     avatar,
