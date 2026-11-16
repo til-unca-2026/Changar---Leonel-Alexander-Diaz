@@ -43,6 +43,7 @@ const MENSAJES = {
   invitacion_ya_existe: 'Ya hay una invitación pendiente para ese email.',
   invitacion_no_encontrada: 'La invitación no existe, ya fue usada o venció.',
   no_puede_modificar_al_dueno: 'No podés modificar la cuenta del dueño de la aplicación.',
+  no_puede_modificar_al_admin: 'No podés gestionar la cuenta de otro administrador.',
 }
 
 const MENSAJES_SUPABASE = {

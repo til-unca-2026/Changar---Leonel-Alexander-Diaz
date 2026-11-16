@@ -18,7 +18,7 @@ function componer(perfil, telefono, email) {
     apellido: perfil.apellido,
     email: email ?? null,
     telefono: telefono ?? '',
-    rol: rolAuth === 'admin' ? 'admin' : perfil.rol,
+    rol: perfil.rol,
     activo: perfil.activo,
     baneadoHasta: perfil.baneado_hasta ?? null,
     esSuperadmin: Boolean(perfil.es_superadmin),
@@ -28,7 +28,7 @@ function componer(perfil, telefono, email) {
   }
 }
 
-async function cargarPerfil(id, emailFallback, rolAuth) {
+async function cargarPerfil(id, emailFallback) {
   const { data: perfil, error } = await supabase
     .from('perfiles')
     .select(COLUMNAS_PERFIL)
@@ -76,8 +76,7 @@ export async function registrar({ nombre, apellido, email, telefono, password, r
 export async function iniciarSesion({ email, password }) {
   const { data, error } = await supabase.auth.signInWithPassword({ email, password })
   if (error) throw error
-  return cargarPerfil(data.user.id, data.user.email,
-  data.user.app_metadata?.role)
+  return cargarPerfil(data.user.id, data.user.email)
 }
 
 /** Devuelve el perfil de la sesión actual, o null. */
@@ -86,7 +85,7 @@ export async function sesionActual() {
   const user = data.session?.user
   if (!user) return null
   try {
-    return await cargarPerfil(user.id, user.email, user.app_metadata?.role)
+    return await cargarPerfil(user.id, user.email)
   } catch {
     return null
   }

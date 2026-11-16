@@ -90,6 +90,8 @@ export default function Usuarios() {
 
   const filtrados = useMemo(() => {
     return usuarios.filter((u) => {
+      // Un administrador normal no ve cuentas de administrador.
+      if (!esDueño && u.rol === 'admin') return false
       if (busqueda) {
         const q = busqueda.toLowerCase()
         const nombre = `${u.nombre} ${u.apellido}`.toLowerCase()
@@ -105,7 +107,7 @@ export default function Usuarios() {
       }
       return true
     })
-  }, [usuarios, busqueda, filtroRol, filtroEstado])
+  }, [usuarios, busqueda, filtroRol, filtroEstado, esDueño])
 
   async function aplicar(fn, okMsg) {
     try {
@@ -325,7 +327,7 @@ export default function Usuarios() {
             <option value="todos">Todos los roles</option>
             <option value="cliente">Cliente</option>
             <option value="trabajador">Trabajador</option>
-            <option value="admin">Administrador</option>
+            {esDueño && <option value="admin">Administrador</option>}
           </Select>
           <Select value={filtroEstado} onChange={(e) => setFiltroEstado(e.target.value)}>
             <option value="todos">Todos los estados</option>
@@ -374,7 +376,7 @@ export default function Usuarios() {
                     </div>
                   </div>
 
-                  {!esYo && (
+                  {!esYo && (esDueño || u.rol !== 'admin') && (
                     <div className="flex flex-wrap gap-2">
                       {marcando === u.id ? (
                         <div className="flex w-full items-center gap-2">
