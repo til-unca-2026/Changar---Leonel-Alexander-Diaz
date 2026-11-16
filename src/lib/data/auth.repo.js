@@ -7,7 +7,8 @@ import { urlPublica } from './almacenamiento.js'
  * de la base (está oculto por grants), se toma de la sesión de Auth.
  */
 
-const COLUMNAS_PERFIL = 'id, nombre, apellido, avatar_path, rol, activo, baneado_hasta, created_at'
+const COLUMNAS_PERFIL =
+  'id, nombre, apellido, avatar_path, rol, activo, baneado_hasta, es_superadmin, created_at'
 
 function componer(perfil, telefono, email) {
   const avatar = perfil.avatar_path ?? null
@@ -20,6 +21,7 @@ function componer(perfil, telefono, email) {
     rol: perfil.rol,
     activo: perfil.activo,
     baneadoHasta: perfil.baneado_hasta ?? null,
+    esSuperadmin: Boolean(perfil.es_superadmin),
     avatar,
     avatarUrl: avatar ? urlPublica('avatares', avatar) : null,
     createdAt: perfil.created_at,
@@ -49,12 +51,20 @@ async function cargarPerfil(id, emailFallback) {
   return componer(perfil, contacto?.telefono, email)
 }
 
-/** Registra un usuario y devuelve su perfil. */
-export async function registrar({ nombre, apellido, email, telefono, password, rol }) {
+/**
+ * Registra un usuario y devuelve su perfil.
+ *
+ * `invitacion` es opcional: si viene el token de una invitación de
+ * administrador, el trigger de alta crea el perfil con rol 'admin'.
+ */
+export async function registrar({ nombre, apellido, email, telefono, password, rol, invitacion }) {
+  const metadata = { nombre, apellido, telefono, rol }
+  if (invitacion) metadata.invitacion = invitacion
+
   const { data, error } = await supabase.auth.signUp({
     email,
     password,
-    options: { data: { nombre, apellido, telefono, rol } },
+    options: { data: metadata },
   })
   if (error) throw error
   if (!data.user) throw new Error('registro_incompleto')

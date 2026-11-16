@@ -19,6 +19,7 @@ export async function listarUsuarios() {
     rol: u.rol,
     activo: u.activo,
     baneadoHasta: u.baneado_hasta,
+    esSuperadmin: Boolean(u.es_superadmin),
     createdAt: u.created_at,
     marcas: u.marcas ?? 0,
     reportesPendientes: u.reportes_pendientes ?? 0,
@@ -117,6 +118,42 @@ export async function resolverContrato(contratacionId, aFavorId) {
   const { error } = await supabase.rpc('admin_resolver_contrato', {
     p_contratacion_id: contratacionId,
     p_a_favor_id: aFavorId,
+  })
+  if (error) throw error
+}
+
+/** Crea una invitación de administrador y devuelve el token del link. */
+export async function crearInvitacion({ email, nombre, apellido }) {
+  const { data, error } = await supabase.rpc('admin_crear_invitacion', {
+    p_email: email,
+    p_nombre: nombre,
+    p_apellido: apellido,
+  })
+  if (error) throw error
+  return data
+}
+
+/** Lista las invitaciones de administrador (pendientes y las ya usadas). */
+export async function listarInvitaciones() {
+  const { data, error } = await supabase.rpc('admin_listar_invitaciones')
+  if (error) throw error
+  return (data ?? []).map((i) => ({
+    id: i.id,
+    email: i.email,
+    nombre: i.nombre,
+    apellido: i.apellido,
+    token: i.token,
+    estado: i.estado,
+    expiraAt: i.expira_at,
+    createdAt: i.created_at,
+    creadoPorNombre: i.creado_por_nombre ?? '',
+  }))
+}
+
+/** Cancela una invitación pendiente. */
+export async function cancelarInvitacion(invitacionId) {
+  const { error } = await supabase.rpc('admin_cancelar_invitacion', {
+    p_invitacion_id: invitacionId,
   })
   if (error) throw error
 }

@@ -1,8 +1,9 @@
-import { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '@/context/AuthContext.jsx'
 import { useToast } from '@/components/ui/Toast.jsx'
 import { mensajeError } from '@/lib/errores.js'
+import * as invitacionesRepo from '@/lib/data/invitaciones.repo.js'
 import Button from '@/components/ui/Button.jsx'
 import Input from '@/components/ui/Input.jsx'
 import Logo from '@/components/ui/Logo.jsx'
@@ -52,10 +53,46 @@ const ICONO_TRABAJADOR = (
   </svg>
 )
 
+const DESTINO_POR_ROL = {
+  cliente: '/cliente',
+  trabajador: '/onboarding/trabajador',
+  admin: '/admin',
+}
+
+// El token de invitación llega en la URL. Se guarda en sessionStorage y se saca
+// de la barra de direcciones para que no quede en el historial del navegador ni
+// en el encabezado Referer de las peticiones a terceros.
+const LLAVE_TOKEN = 'changar_invitacion_admin'
+
+function leerTokenGuardado() {
+  try {
+    return window.sessionStorage.getItem(LLAVE_TOKEN) || ''
+  } catch {
+    return ''
+  }
+}
+
+function guardarToken(token) {
+  try {
+    window.sessionStorage.setItem(LLAVE_TOKEN, token)
+  } catch {
+    /* almacenamiento bloqueado: el token sigue en la URL de esta sesión */
+  }
+}
+
+function borrarTokenGuardado() {
+  try {
+    window.sessionStorage.removeItem(LLAVE_TOKEN)
+  } catch {
+    /* nada que hacer */
+  }
+}
+
 export default function Registro() {
   const { registrar } = useAuth()
   const { mostrar } = useToast()
   const navigate = useNavigate()
+  const [searchParams, setSearchParams] = useSearchParams()
 
   const [form, setForm] = useState({
     rol: 'cliente',
@@ -68,6 +105,51 @@ export default function Registro() {
   const [error, setError] = useState('')
   const [enviando, setEnviando] = useState(false)
 
+  const [token, setToken] = useState('')
+  const [invitacion, setInvitacion] = useState(null)
+  const [invitacionInvalida, setInvitacionInvalida] = useState(false)
+
+  // Si el link trae el token, se aparta de la URL apenas se lee.
+  useEffect(() => {
+    const deUrl = searchParams.get('invitacion')
+    if (!deUrl) return
+    guardarToken(deUrl)
+    setSearchParams({}, { replace: true })
+  }, [searchParams, setSearchParams])
+
+  // Carga la invitación (sin sesión: es un link que puede llegar por correo o
+  // mensajería). Si el token no es válido se avisa y se sigue con el registro
+  // normal.
+  useEffect(() => {
+    let activo = true
+    const t = searchParams.get('invitacion') || leerTokenGuardado()
+    if (!t) return
+
+    setToken(t)
+    invitacionesRepo
+      .porToken(t)
+      .then((inv) => {
+        if (!activo) return
+        if (!inv) {
+          setInvitacionInvalida(true)
+          return
+        }
+        setInvitacion(inv)
+        setForm((f) => ({
+          ...f,
+          nombre: f.nombre || inv.nombre || '',
+          apellido: f.apellido || inv.apellido || '',
+          email: f.email || inv.email || '',
+        }))
+      })
+      .catch(() => {
+        if (activo) setInvitacionInvalida(true)
+      })
+    return () => {
+      activo = false
+    }
+  }, [searchParams])
+
   function campo(nombre) {
     return (e) => setForm((f) => ({ ...f, [nombre]: e.target.value }))
   }
@@ -76,8 +158,12 @@ export default function Registro() {
     e.preventDefault()
     setError('')
 
-    if (!form.nombre || !form.apellido || !form.email || !form.telefono || !form.password) {
-      setError('Completá todos los campos.')
+    if (!form.nombre || !form.apellido || !form.email || !form.password) {
+      setError('Completá todos los campos obligatorios.')
+      return
+    }
+    if (!invitacion && !form.telefono) {
+      setError('Completá el número de teléfono.')
       return
     }
     if (form.password.length < 6) {
@@ -87,11 +173,24 @@ export default function Registro() {
 
     try {
       setEnviando(true)
-      const usuario = await registrar(form)
-      mostrar('¡Cuenta creada! Bienvenido a ChangAr.', 'exito')
-      navigate(usuario.rol === 'trabajador' ? '/onboarding/trabajador' : '/cliente', {
-        replace: true,
+      const usuario = await registrar({
+        ...form,
+        rol: invitacion ? 'cliente' : form.rol,
+        invitacion: invitacion ? token : null,
       })
+      borrarTokenGuardado()
+      if (invitacion && usuario.rol !== 'admin') {
+        // La invitación se consumió entre la apertura del link y el envío.
+        mostrar('La invitación ya había sido usada. Tu cuenta se creó como cliente.', 'info')
+      } else {
+        mostrar(
+          invitacion
+            ? '¡Cuenta creada! Ya sos administrador de ChangAr.'
+            : '¡Cuenta creada! Bienvenido a ChangAr.',
+          'exito'
+        )
+      }
+      navigate(DESTINO_POR_ROL[usuario.rol] ?? '/cliente', { replace: true })
     } catch (err) {
       setError(mensajeError(err))
     } finally {
@@ -109,22 +208,43 @@ export default function Registro() {
       <h1 className="mt-8 text-2xl font-extrabold">¡Te damos la bienvenida!</h1>
       <p className="mt-1 text-muted">Elegí cómo querés usar la aplicación para comenzar</p>
 
-      <div className="mt-5 space-y-3">
-        <OpcionRol
-          activo={form.rol === 'cliente'}
-          titulo="Busco un Profesional"
-          texto="Para resolver reparaciones, reformas o tareas del hogar."
-          icono={ICONO_CLIENTE}
-          onClick={() => setForm((f) => ({ ...f, rol: 'cliente' }))}
-        />
-        <OpcionRol
-          activo={form.rol === 'trabajador'}
-          titulo="Quiero Ofrecer mi Oficio"
-          texto="Para postular a solicitudes y conseguir nuevos clientes."
-          icono={ICONO_TRABAJADOR}
-          onClick={() => setForm((f) => ({ ...f, rol: 'trabajador' }))}
-        />
-      </div>
+      {invitacion && (
+        <div className="mt-5 rounded-2xl border border-primary/30 bg-primary-soft p-4">
+          <p className="font-bold text-primary">Te invitaron a ser administrador</p>
+          <p className="mt-1 text-sm text-muted">
+            Creá tu cuenta con este acceso y vas a entrar al panel de administración de ChangAr.
+          </p>
+        </div>
+      )}
+
+      {invitacionInvalida && !invitacion && (
+        <div className="mt-5 rounded-2xl border border-amber-200 bg-amber-50 p-4">
+          <p className="font-bold text-warning">Invitación no válida</p>
+          <p className="mt-1 text-sm text-muted">
+            El link venció, ya se usó o fue cancelado. Podés registrarte igual como cliente o
+            trabajador.
+          </p>
+        </div>
+      )}
+
+      {!invitacion && (
+        <div className="mt-5 space-y-3">
+          <OpcionRol
+            activo={form.rol === 'cliente'}
+            titulo="Busco un Profesional"
+            texto="Para resolver reparaciones, reformas o tareas del hogar."
+            icono={ICONO_CLIENTE}
+            onClick={() => setForm((f) => ({ ...f, rol: 'cliente' }))}
+          />
+          <OpcionRol
+            activo={form.rol === 'trabajador'}
+            titulo="Quiero Ofrecer mi Oficio"
+            texto="Para postular a solicitudes y conseguir nuevos clientes."
+            icono={ICONO_TRABAJADOR}
+            onClick={() => setForm((f) => ({ ...f, rol: 'trabajador' }))}
+          />
+        </div>
+      )}
 
       <form onSubmit={onSubmit} className="mt-6 space-y-4">
         <div className="grid grid-cols-2 gap-3">
@@ -138,6 +258,7 @@ export default function Registro() {
           value={form.telefono}
           onChange={campo('telefono')}
           placeholder="+54 11 5824-9102"
+          required={!invitacion}
         />
         <Input
           label="Contraseña"
