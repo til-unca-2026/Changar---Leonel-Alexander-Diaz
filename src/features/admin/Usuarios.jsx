@@ -7,6 +7,7 @@ import Avatar from '@/components/ui/Avatar.jsx'
 import Badge from '@/components/ui/Badge.jsx'
 import Button from '@/components/ui/Button.jsx'
 import Card from '@/components/ui/Card.jsx'
+import ConfirmarAccion from '@/components/ui/ConfirmarAccion.jsx'
 import Input from '@/components/ui/Input.jsx'
 import Select from '@/components/ui/Select.jsx'
 import Spinner from '@/components/ui/Spinner.jsx'
@@ -19,6 +20,57 @@ const ESTADO_INVITACION = {
   cancelada: { etiqueta: 'Cancelada', estado: 'cancelado' },
   expirada: { etiqueta: 'Vencida', estado: 'cancelado' },
 }
+
+/** Diálogos de sanción: textos y configuración de cada acción. */
+const DIALOGOS = {
+  marcar: {
+    titulo: 'Marcar perfil',
+    mensaje: (u) =>
+      `Se registrará una advertencia privada en el historial de ${u.nombre} ${u.apellido}.`,
+    textoConfirmar: 'Marcar',
+    varianteConfirmar: 'primary',
+    motivo: true,
+    ok: 'Marca de advertencia aplicada.',
+  },
+  ban7: {
+    titulo: 'Suspender 7 días',
+    mensaje: (u) =>
+      `Se suspenderá a ${u.nombre} ${u.apellido} por 7 días: no podrá recibir solicitudes.`,
+    textoConfirmar: 'Suspender 7 días',
+    varianteConfirmar: 'outline',
+    motivo: true,
+    ok: 'Cuenta suspendida.',
+  },
+  ban30: {
+    titulo: 'Suspender 30 días',
+    mensaje: (u) =>
+      `Se suspenderá a ${u.nombre} ${u.apellido} por 30 días: no podrá recibir solicitudes.`,
+    textoConfirmar: 'Suspender 30 días',
+    varianteConfirmar: 'outline',
+    motivo: true,
+    ok: 'Cuenta suspendida.',
+  },
+  ban: {
+    titulo: 'Banear permanentemente',
+    mensaje: (u) =>
+      `Se bloqueará la cuenta de ${u.nombre} ${u.apellido}. Se cancelan sus solicitudes abiertas y se retiran sus propuestas enviadas.`,
+    textoConfirmar: 'Banear',
+    varianteConfirmar: 'danger',
+    motivo: true,
+    ok: 'Cuenta bloqueada.',
+  },
+  desbanear: {
+    titulo: 'Reactivar cuenta',
+    mensaje: (u) =>
+      `La cuenta de ${u.nombre} ${u.apellido} volverá a estar habilitada y podrá operar con normalidad.`,
+    textoConfirmar: 'Reactivar',
+    varianteConfirmar: 'primary',
+    motivo: false,
+    ok: 'Cuenta reactivada.',
+  },
+}
+
+const DIAS_DIALOGO = { ban7: 7, ban30: 30, ban: null }
 
 /** Link de registro de una invitación de administrador. */
 function linkDeInvitacion(token) {
@@ -50,9 +102,8 @@ export default function Usuarios() {
   const [busqueda, setBusqueda] = useState('')
   const [filtroRol, setFiltroRol] = useState('todos')
   const [filtroEstado, setFiltroEstado] = useState('todos')
-  const [marcando, setMarcando] = useState(null)
-  const [motivo, setMotivo] = useState('')
-  const [accionando, setAccionando] = useState(null)
+  const [dialogo, setDialogo] = useState(null)
+  const [procesandoDialogo, setProcesandoDialogo] = useState(false)
 
   const esDueño = Boolean(usuario?.esSuperadmin)
   const [invitaciones, setInvitaciones] = useState([])
@@ -116,36 +167,38 @@ export default function Usuarios() {
       await recargar()
     } catch (err) {
       mostrar(mensajeError(err), 'error')
-    } finally {
-      setAccionando(null)
     }
   }
 
-  function banear(u, dias) {
-    if (!window.confirm(dias ? `Suspender a ${u.nombre} por ${dias} días?` : `BLOQUEAR permanentemente a ${u.nombre}?`)) return
-    setAccionando(u.id)
-    aplicar(() => adminRepo.banear(u.id, dias), dias ? 'Cuenta suspendida.' : 'Cuenta bloqueada.')
+  function abrirDialogo(tipo, u) {
+    setDialogo({ tipo, usuario: u })
   }
 
-  function desbanear(u) {
-    setAccionando(u.id)
-    aplicar(() => adminRepo.desbanear(u.id), 'Cuenta reactivada.')
+  async function confirmarDialogo(motivoSancion) {
+    if (!dialogo) return
+    const { tipo, usuario: u } = dialogo
+    const config = DIALOGOS[tipo]
+    setProcesandoDialogo(true)
+    try {
+      if (tipo === 'desbanear') {
+        await adminRepo.desbanear(u.id)
+      } else if (tipo === 'marcar') {
+        await adminRepo.marcar(u.id, motivoSancion)
+      } else {
+        await adminRepo.banear(u.id, DIAS_DIALOGO[tipo], motivoSancion)
+      }
+      mostrar(config.ok, 'exito')
+      setDialogo(null)
+      await recargar()
+    } catch (err) {
+      mostrar(mensajeError(err), 'error')
+    } finally {
+      setProcesandoDialogo(false)
+    }
   }
 
   function cambiarRol(u, rol) {
-    setAccionando(u.id)
     aplicar(() => adminRepo.cambiarRol(u.id, rol), 'Rol actualizado.')
-  }
-
-  function marcar(u) {
-    if (!motivo.trim()) {
-      mostrar('Escribí el motivo de la advertencia.', 'error')
-      return
-    }
-    setAccionando(u.id)
-    aplicar(() => adminRepo.marcar(u.id, motivo), 'Marca de advertencia aplicada.')
-    setMarcando(null)
-    setMotivo('')
   }
 
   async function crearInvitacion(e) {
@@ -378,60 +431,60 @@ export default function Usuarios() {
 
                   {!esYo && (esDueño || u.rol !== 'admin') && (
                     <div className="flex flex-wrap gap-2">
-                      {marcando === u.id ? (
-                        <div className="flex w-full items-center gap-2">
-                          <Input
-                            placeholder="Motivo de la advertencia"
-                            value={motivo}
-                            onChange={(e) => setMotivo(e.target.value)}
-                            className="flex-1"
-                          />
-                          <Button className="px-3 py-2 text-sm" onClick={() => marcar(u)} disabled={accionando === u.id}>
-                            Aplicar
-                          </Button>
-                          <Button variante="outline" className="px-3 py-2 text-sm" onClick={() => { setMarcando(null); setMotivo('') }}>
-                            ✕
-                          </Button>
-                        </div>
-                      ) : (
+                      <Button
+                        variante="outline"
+                        className="px-3 py-2 text-sm"
+                        onClick={() => abrirDialogo('marcar', u)}
+                      >
+                        Marcar
+                      </Button>
+                      {u.activo && !suspendido ? (
                         <>
-                          <Button variante="outline" className="px-3 py-2 text-sm" onClick={() => { setMarcando(u.id); setMotivo('') }}>
-                            Marcar
+                          <Button
+                            variante="outline"
+                            className="px-3 py-2 text-sm"
+                            onClick={() => abrirDialogo('ban7', u)}
+                          >
+                            7d
                           </Button>
-                          {u.activo && !suspendido ? (
-                            <>
-                              <Button variante="outline" className="px-3 py-2 text-sm" onClick={() => banear(u, 7)} disabled={accionando === u.id}>
-                                7d
-                              </Button>
-                              <Button variante="outline" className="px-3 py-2 text-sm" onClick={() => banear(u, 30)} disabled={accionando === u.id}>
-                                30d
-                              </Button>
-                              <Button variante="danger" className="px-3 py-2 text-sm" onClick={() => banear(u, null)} disabled={accionando === u.id}>
-                                Ban
-                              </Button>
-                            </>
-                          ) : (
-                            <Button className="px-3 py-2 text-sm" onClick={() => desbanear(u)} disabled={accionando === u.id}>
-                              Desbanear
-                            </Button>
-                          )}
-                          {u.esSuperadmin ? (
-                            <span className="text-xs text-muted">Dueño</span>
-                          ) : u.rol !== 'admin' || esDueño ? (
-                            <Select
-                              className="w-auto"
-                              value=""
-                              onChange={(e) => e.target.value && cambiarRol(u, e.target.value)}
-                            >
-                              <option value="">Rol…</option>
-                              <option value="cliente">Cliente</option>
-                              <option value="trabajador">Trabajador</option>
-                              {esDueño && <option value="admin">Admin</option>}
-                            </Select>
-                          ) : (
-                            <span className="text-xs text-muted">Admin</span>
-                          )}
+                          <Button
+                            variante="outline"
+                            className="px-3 py-2 text-sm"
+                            onClick={() => abrirDialogo('ban30', u)}
+                          >
+                            30d
+                          </Button>
+                          <Button
+                            variante="danger"
+                            className="px-3 py-2 text-sm"
+                            onClick={() => abrirDialogo('ban', u)}
+                          >
+                            Ban
+                          </Button>
                         </>
+                      ) : (
+                        <Button
+                          className="px-3 py-2 text-sm"
+                          onClick={() => abrirDialogo('desbanear', u)}
+                        >
+                          Desbanear
+                        </Button>
+                      )}
+                      {u.esSuperadmin ? (
+                        <span className="text-xs text-muted">Dueño</span>
+                      ) : u.rol !== 'admin' || esDueño ? (
+                        <Select
+                          className="w-auto"
+                          value=""
+                          onChange={(e) => e.target.value && cambiarRol(u, e.target.value)}
+                        >
+                          <option value="">Rol…</option>
+                          <option value="cliente">Cliente</option>
+                          <option value="trabajador">Trabajador</option>
+                          {esDueño && <option value="admin">Admin</option>}
+                        </Select>
+                      ) : (
+                        <span className="text-xs text-muted">Admin</span>
                       )}
                     </div>
                   )}
@@ -440,6 +493,21 @@ export default function Usuarios() {
             )
           })}
         </div>
+      )}
+
+      {dialogo && (
+        <ConfirmarAccion
+          abierto
+          titulo={DIALOGOS[dialogo.tipo].titulo}
+          mensaje={DIALOGOS[dialogo.tipo].mensaje(dialogo.usuario)}
+          motivoRequerido={Boolean(DIALOGOS[dialogo.tipo].motivo)}
+          etiquetaMotivo="Motivo de la sanción"
+          textoConfirmar={DIALOGOS[dialogo.tipo].textoConfirmar}
+          varianteConfirmar={DIALOGOS[dialogo.tipo].varianteConfirmar}
+          cargando={procesandoDialogo}
+          onConfirmar={confirmarDialogo}
+          onCancelar={() => setDialogo(null)}
+        />
       )}
     </div>
   )

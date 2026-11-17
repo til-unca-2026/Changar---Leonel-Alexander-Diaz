@@ -83,10 +83,11 @@ export async function marcar(perfilId, motivo) {
   if (error) throw error
 }
 
-export async function banear(perfilId, dias) {
+export async function banear(perfilId, dias, motivo) {
   const { error } = await supabase.rpc('admin_banear', {
     p_perfil_id: perfilId,
     p_dias: dias,
+    p_motivo: motivo,
   })
   if (error) throw error
 }
@@ -94,6 +95,20 @@ export async function banear(perfilId, dias) {
 export async function desbanear(perfilId) {
   const { error } = await supabase.rpc('admin_desbanear', { p_perfil_id: perfilId })
   if (error) throw error
+}
+
+/** Historial de sanciones y advertencias de un perfil (solo admin). */
+export async function sancionesDe(perfilId) {
+  const { data, error } = await supabase.rpc('admin_sanciones_de', { p_perfil_id: perfilId })
+  if (error) throw error
+  return (data ?? []).map((s) => ({
+    id: s.id,
+    tipo: s.tipo,
+    dias: s.dias ?? null,
+    motivo: s.motivo ?? '',
+    aplicadaPor: s.aplicada_por ?? '',
+    createdAt: s.created_at,
+  }))
 }
 
 export async function cambiarRol(perfilId, rol) {

@@ -44,6 +44,7 @@ const MENSAJES = {
   invitacion_no_encontrada: 'La invitación no existe, ya fue usada o venció.',
   no_puede_modificar_al_dueno: 'No podés modificar la cuenta del dueño de la aplicación.',
   no_puede_modificar_al_admin: 'No podés gestionar la cuenta de otro administrador.',
+  motivo_vacio: 'Escribí el motivo de la sanción.',
 }
 
 const MENSAJES_SUPABASE = {
@@ -101,6 +102,8 @@ export function mensajeError(error) {
   if (/invitacion_ya_existe/i.test(codigo)) return MENSAJES.invitacion_ya_existe
   if (/invitacion_no_encontrada/i.test(codigo)) return MENSAJES.invitacion_no_encontrada
   if (/no_puede_modificar_al_dueno/i.test(codigo)) return MENSAJES.no_puede_modificar_al_dueno
+  if (/no_puede_modificar_al_admin/i.test(codigo)) return MENSAJES.no_puede_modificar_al_admin
+  if (/motivo_vacio/i.test(codigo)) return MENSAJES.motivo_vacio
 
   if (/propuestas_solicitud_id_trabajador_id_key/i.test(codigo)) {
     return 'Ya enviaste una propuesta a esta solicitud.'

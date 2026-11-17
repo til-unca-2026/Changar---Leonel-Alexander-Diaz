@@ -10,7 +10,7 @@ import { urlPublica } from './almacenamiento.js'
 export async function obtenerBase(id) {
   const { data, error } = await supabase
     .from('perfiles')
-    .select('id, nombre, apellido, avatar_path, rol, activo, baneado_hasta, created_at')
+    .select('id, nombre, apellido, avatar_path, rol, activo, baneado_hasta, es_superadmin, created_at')
     .eq('id', id)
     .maybeSingle()
   if (error) throw error
@@ -24,6 +24,7 @@ export async function obtenerBase(id) {
     createdAt: data.created_at,
     activo: data.activo,
     suspendidoHasta: data.baneado_hasta ?? null,
+    esSuperadmin: Boolean(data.es_superadmin),
     habilitado: estaHabilitado(data),
   }
 }
