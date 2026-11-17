@@ -7,7 +7,45 @@ import { fechaRelativa } from '@/lib/format.js'
 import Badge from '@/components/ui/Badge.jsx'
 import Button from '@/components/ui/Button.jsx'
 import Card from '@/components/ui/Card.jsx'
+import ConfirmarAccion from '@/components/ui/ConfirmarAccion.jsx'
 import Spinner from '@/components/ui/Spinner.jsx'
+
+const REPORTE_DIALOGOS = {
+  descartar: {
+    titulo: 'Descartar reporte',
+    textoConfirmar: 'Descartar',
+    varianteConfirmar: 'outline',
+    motivo: false,
+  },
+  marca: {
+    titulo: 'Marcar perfil',
+    textoConfirmar: 'Marcar',
+    varianteConfirmar: 'primary',
+    motivo: true,
+  },
+  ban_temporal_7: {
+    titulo: 'Suspender 7 días',
+    textoConfirmar: 'Suspender 7 días',
+    varianteConfirmar: 'outline',
+    motivo: true,
+  },
+  ban_temporal_30: {
+    titulo: 'Suspender 30 días',
+    textoConfirmar: 'Suspender 30 días',
+    varianteConfirmar: 'outline',
+    motivo: true,
+  },
+  ban_permanente: {
+    titulo: 'Banear permanentemente',
+    textoConfirmar: 'Banear',
+    varianteConfirmar: 'danger',
+    motivo: true,
+  },
+}
+
+function claveDialogo(accion, dias) {
+  return accion === 'ban_temporal' ? `ban_temporal_${dias}` : accion
+}
 
 function Galeria({ fotos }) {
   return (
@@ -28,7 +66,8 @@ export default function Reportes() {
   const [reportes, setReportes] = useState([])
   const [contratos, setContratos] = useState([])
   const [cargando, setCargando] = useState(true)
-  const [accionando, setAccionando] = useState(null)
+  const [dialogo, setDialogo] = useState(null)
+  const [procesando, setProcesando] = useState(false)
 
   async function recargar() {
     const [rep, cont] = await Promise.all([
@@ -45,33 +84,75 @@ export default function Reportes() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  async function resolverReporte(r, accion, dias) {
-    if (!window.confirm(`Aplicar "${accion}" sobre ${r.perfilNombre}?`)) return
+  function abrirResolucion(reporte, accion, dias = null) {
+    setDialogo({ tipo: 'reporte', reporte, accion, dias })
+  }
+
+  function abrirContrato(contrato, aFavorId) {
+    setDialogo({ tipo: 'contrato', contrato, aFavorId })
+  }
+
+  function configuracionDialogo() {
+    if (!dialogo) return null
+
+    if (dialogo.tipo === 'contrato') {
+      const { contrato: c, aFavorId } = dialogo
+      const aFavorNombre =
+        aFavorId === c.clienteId ? c.clienteNombre : c.trabajadorNombre
+      const sancionadoNombre =
+        aFavorId === c.clienteId ? c.trabajadorNombre : c.clienteNombre
+      return {
+        titulo: 'Resolver contrato reportado',
+        mensaje: `Se dará la razón a ${aFavorNombre} y se aplicará una advertencia a ${sancionadoNombre}.`,
+        textoConfirmar: 'Resolver',
+        varianteConfirmar: 'primary',
+        motivo: false,
+      }
+    }
+
+    const { reporte: r, accion, dias } = dialogo
+    const base = REPORTE_DIALOGOS[claveDialogo(accion, dias)]
+    if (!base) return null
+
+    const mensajes = {
+      descartar: `El reporte contra ${r.perfilNombre} se descarta y no se aplica ninguna sanción.`,
+      marca: `Se aplicará una advertencia a ${r.perfilNombre} y el reporte quedará resuelto.`,
+      ban_temporal: `Se suspenderá a ${r.perfilNombre} por ${dias} días: no podrá recibir solicitudes.`,
+      ban_permanente: `Se bloqueará la cuenta de ${r.perfilNombre}. Se cancelan sus solicitudes abiertas y se retiran sus propuestas enviadas.`,
+    }
+
+    return { ...base, mensaje: mensajes[accion] ?? '' }
+  }
+
+  async function confirmarDialogo(motivo) {
+    if (!dialogo) return
+    setProcesando(true)
     try {
-      setAccionando(r.id)
-      await adminRepo.resolverReporte(r.id, accion, dias, r.motivo)
-      mostrar('Reporte resuelto.', 'exito')
+      if (dialogo.tipo === 'contrato') {
+        await adminRepo.resolverContrato(
+          dialogo.contrato.contratacionId,
+          dialogo.aFavorId,
+        )
+        mostrar('Contrato resuelto.', 'exito')
+      } else {
+        await adminRepo.resolverReporte(
+          dialogo.reporte.id,
+          dialogo.accion,
+          dialogo.dias,
+          motivo || null,
+        )
+        mostrar('Reporte resuelto.', 'exito')
+      }
+      setDialogo(null)
       await recargar()
     } catch (err) {
       mostrar(mensajeError(err), 'error')
     } finally {
-      setAccionando(null)
+      setProcesando(false)
     }
   }
 
-  async function resolverContrato(c, aFavorId) {
-    if (!window.confirm('Dar la razón y sancionar a la contraparte?')) return
-    try {
-      setAccionando(c.contratacionId)
-      await adminRepo.resolverContrato(c.contratacionId, aFavorId)
-      mostrar('Contrato resuelto.', 'exito')
-      await recargar()
-    } catch (err) {
-      mostrar(mensajeError(err), 'error')
-    } finally {
-      setAccionando(null)
-    }
-  }
+  const config = configuracionDialogo()
 
   if (cargando) {
     return (
@@ -133,19 +214,19 @@ export default function Reportes() {
 
                   {r.estado === 'pendiente' && (
                     <div className="mt-3 flex flex-wrap gap-2">
-                      <Button variante="outline" className="px-3 py-2 text-sm" onClick={() => resolverReporte(r, 'descartar')} disabled={accionando === r.id}>
+                      <Button variante="outline" className="px-3 py-2 text-sm" onClick={() => abrirResolucion(r, 'descartar')}>
                         Descartar
                       </Button>
-                      <Button variante="outline" className="px-3 py-2 text-sm" onClick={() => resolverReporte(r, 'marca')} disabled={accionando === r.id}>
+                      <Button variante="outline" className="px-3 py-2 text-sm" onClick={() => abrirResolucion(r, 'marca')}>
                         Marcar
                       </Button>
-                      <Button variante="outline" className="px-3 py-2 text-sm" onClick={() => resolverReporte(r, 'ban_temporal', 7)} disabled={accionando === r.id}>
+                      <Button variante="outline" className="px-3 py-2 text-sm" onClick={() => abrirResolucion(r, 'ban_temporal', 7)}>
                         Ban 7d
                       </Button>
-                      <Button variante="outline" className="px-3 py-2 text-sm" onClick={() => resolverReporte(r, 'ban_temporal', 30)} disabled={accionando === r.id}>
+                      <Button variante="outline" className="px-3 py-2 text-sm" onClick={() => abrirResolucion(r, 'ban_temporal', 30)}>
                         Ban 30d
                       </Button>
-                      <Button variante="danger" className="px-3 py-2 text-sm" onClick={() => resolverReporte(r, 'ban_permanente')} disabled={accionando === r.id}>
+                      <Button variante="danger" className="px-3 py-2 text-sm" onClick={() => abrirResolucion(r, 'ban_permanente')}>
                         Ban permanente
                       </Button>
                     </div>
@@ -208,10 +289,10 @@ export default function Reportes() {
                     </p>
                   ) : (
                     <div className="mt-3 flex flex-wrap gap-2">
-                      <Button className="px-3 py-2 text-sm" onClick={() => resolverContrato(c, c.clienteId)} disabled={accionando === c.contratacionId}>
+                      <Button className="px-3 py-2 text-sm" onClick={() => abrirContrato(c, c.clienteId)}>
                         A favor del cliente
                       </Button>
-                      <Button className="px-3 py-2 text-sm" onClick={() => resolverContrato(c, c.trabajadorId)} disabled={accionando === c.contratacionId}>
+                      <Button className="px-3 py-2 text-sm" onClick={() => abrirContrato(c, c.trabajadorId)}>
                         A favor del trabajador
                       </Button>
                     </div>
@@ -221,6 +302,21 @@ export default function Reportes() {
             </div>
           )}
         </>
+      )}
+
+      {config && (
+        <ConfirmarAccion
+          abierto
+          titulo={config.titulo}
+          mensaje={config.mensaje}
+          motivoRequerido={Boolean(config.motivo)}
+          etiquetaMotivo="Motivo de la sanción"
+          textoConfirmar={config.textoConfirmar}
+          varianteConfirmar={config.varianteConfirmar}
+          cargando={procesando}
+          onConfirmar={confirmarDialogo}
+          onCancelar={() => setDialogo(null)}
+        />
       )}
     </div>
   )

@@ -134,6 +134,11 @@ export default function Perfil() {
         <h1 className="text-2xl font-extrabold lg:text-3xl">Mi cuenta</h1>
         <p className="mt-1 text-muted">
           {usuario?.nombre} {usuario?.apellido} · {ETIQUETA_ROL[usuario?.rol]}
+          {usuario?.esSuperadmin && (
+            <span className="ml-2 inline-block rounded-full bg-green-50 px-2 py-0.5 text-xs font-bold text-success">
+              Dueño
+            </span>
+          )}
         </p>
       </div>
 

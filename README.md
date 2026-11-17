@@ -29,6 +29,9 @@ un sistema de reputación basado en trabajos realizados y valoraciones.
   (aprobar, rechazar y fusionar duplicados), gestión de usuarios (marcas de advertencia
   privadas, ban temporal/permanente, cambio de rol) y reportes de perfiles y contratos
   reportados (con resolución a favor de una parte).
+- **Dueño de la app y administradores**: una cuenta `es_superadmin` (el dueño) es la
+  única que puede crear cuentas de administrador, mediante links de invitación de un solo
+  uso. El dueño es intocable y los demás administradores no pueden generar administradores.
 - **Notificaciones in-app**: avisos por propuestas, contrataciones, valoraciones, oficios y
   reportes, con centro de notificaciones y badge en el header.
 - **Exploración de perfiles y solicitudes personales**: el cliente busca trabajadores con
@@ -53,18 +56,80 @@ un sistema de reputación basado en trabajos realizados y valoraciones.
    npx supabase db push
    ```
 
-### Crear el primer administrador
+Para levantar un entorno local con datos de arranque (catálogo de oficios y un
+usuario dueño `owner@changar.local` / `changar1234`):
 
-El registro público no permite el rol `admin`. Promové una cuenta desde el SQL Editor de
-Supabase:
-
-```sql
-update perfiles
-   set rol = 'admin'
- where email = 'tu-email@ejemplo.com';
+```bash
+npx supabase start
+npx supabase db reset
 ```
 
-Después recargá la app (o volvé a iniciar sesión) para que tome el rol nuevo.
+El seed es `supabase/seed.sql` (el que declara `config.toml` en `[db.seed]`).
+
+### Operaciones de base de datos
+
+El password de la base y el project ref viven en `.env.local` (gitignored), con
+nombres sin prefijo `VITE_` para que Vite no los meta en el bundle del cliente.
+Para aplicar migraciones contra el proyecto alojado:
+
+```bash
+$env:SUPABASE_DB_PASSWORD = (Get-Content .env.local | Where-Object { $_ -match '^SUPABASE_DB_PASSWORD=' }) -replace '^SUPABASE_DB_PASSWORD=', ''
+npx supabase link --project-ref faoksfvrvbomttngwiqg
+npx supabase db push
+```
+
+> Si usás el flag `--password`, escapá los caracteres especiales (`#`, `!`): en
+> PowerShell se manglinguean y el login falla con `password authentication failed`.
+> Pasarlo por variable de entorno es lo seguro.
+
+### Crear el primer administrador (dueño)
+
+El registro público no permite los roles `admin` ni de dueño: el trigger de alta
+rechaza esos valores y ninguna RPC acepta crear un dueño. La primera cuenta de
+administración se promueve a mano desde el SQL Editor de Supabase.
+
+1. Registrate en la app (`/registro`) con el email que vas a usar como dueño.
+2. Promové la cuenta:
+
+   ```sql
+   update perfiles
+      set rol = 'admin',
+          es_superadmin = true
+    where email = 'tu-email@ejemplo.com';
+   ```
+
+3. Recargá la app (o volvé a iniciar sesión) para que tome el rol nuevo.
+
+`es_superadmin` marca al dueño de la app: es un administrador con la prerrogativa
+extra de gestionar cuentas de administrador. La marca es un booleano y no un valor
+del enum `rol_usuario` a propósito, así que **no existe ninguna RPC que pueda
+asignarla**: crearla es una decisión manual del dueño.
+
+### Gestionar administradores
+
+Desde el panel de administración, la sección **Crear administrador** (solo visible
+para el dueño) genera un link de invitación de un solo uso:
+
+1. Completás email, nombre y apellido de la persona a invitar.
+2. Copiás el link y se lo compartís por el canal que quieras.
+3. La persona se registra con ese link, elige su propia contraseña y entra
+   directo al panel.
+
+El link vence a los 7 días y se invalida al usarse. La persona invitada **nunca ve
+una contraseña que le haya generado el dueño**: cada administrador elige la suya.
+Desde esa misma sección se cancelan las invitaciones pendientes.
+
+Detalles de seguridad del diseño:
+
+- El **token es el único factor**: la invitación se busca por token y nunca por
+  email, porque el proyecto no exige confirmar el email y cualquiera puede
+  registrarse con cualquier dirección.
+- El dueño es **intocable**: ninguna RPC de administración lo marca, lo suspende
+  ni lo degrada.
+- **Solo el dueño da o quita el rol `admin`**. Los demás administradores
+  moderan oficios, reportes y sanciones, pero no gestionan cuentas.
+- La tabla de invitaciones queda como registro de qué administrador creó cada
+  cuenta.
 
 ## Requisitos
 
@@ -107,8 +172,8 @@ src/
 ├─ hooks/         # useSolicitudes, useOficios, useReputacion
 └─ lib/
    ├─ data/       # repositorios Supabase: auth, oficios, perfiles, solicitudes,
-   │              #   propuestas, contrataciones, valoraciones, portfolio, admin
-   │              #   + almacenamiento (Storage)
+   │              #   propuestas, contrataciones, valoraciones, portfolio, admin,
+   │              #   invitaciones + almacenamiento (Storage)
    ├─ supabase.js # cliente de Supabase
    ├─ errores.js  # mapeo de códigos de error a mensajes
    ├─ format.js   # moneda ARS y fechas
