@@ -411,6 +411,33 @@ export default function PublicProfile() {
                   </span>
                 ))}
               </div>
+
+              {perfil.subareas?.length > 0 && (
+                <div className="mt-4 space-y-3 border-t border-line pt-4">
+                  <h3 className="text-sm font-bold">Especialidades</h3>
+                  {perfil.oficios
+                    .filter((nombre) =>
+                      perfil.subareas.some((s) => s.oficioNombre === nombre),
+                    )
+                    .map((nombre) => (
+                      <div key={nombre}>
+                        <p className="text-xs font-semibold text-muted">{nombre}</p>
+                        <div className="mt-1 flex flex-wrap gap-1.5">
+                          {perfil.subareas
+                            .filter((s) => s.oficioNombre === nombre)
+                            .map((s) => (
+                              <span
+                                key={s.id}
+                                className="rounded-full border border-line bg-canvas px-2.5 py-1 text-xs font-semibold text-ink"
+                              >
+                                {s.nombre}
+                              </span>
+                            ))}
+                        </div>
+                      </div>
+                    ))}
+                </div>
+              )}
             </Card>
           )}
 

@@ -18,6 +18,8 @@ const ENTIDADES = {
   perfil_contacto: 'Teléfono',
   oficios: 'Oficio',
   trabajador_oficios: 'Oficios del trabajador',
+  oficio_subareas: 'Especialidad de oficio',
+  trabajador_subareas: 'Especialidades del trabajador',
   portfolio_fotos: 'Portfolio',
   solicitudes: 'Solicitud',
   solicitud_fotos: 'Fotos de solicitud',

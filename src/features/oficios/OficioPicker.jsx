@@ -18,6 +18,8 @@ export default function OficioPicker({
   multiple = false,
   permitirCrear = true,
   opciones = null,
+  crear = null,
+  seleccionarAlCrear = true,
   label,
   ayuda,
   placeholder = 'Buscar o agregar un oficio…',
@@ -95,12 +97,18 @@ export default function OficioPicker({
     try {
       setCreando(true)
       setError('')
-      const nuevo = await crearPendiente(q)
-      await recargar()
-      if (multiple) {
-        if (!seleccionados.includes(nuevo.id)) onChange([...seleccionados, nuevo.id], nuevo)
-      } else {
-        onChange(nuevo.id, nuevo)
+      const nuevo = crear ? await crear(q) : await crearPendiente(q)
+      // Si la lista es fija (opciones), el padre la actualiza; mientras tanto
+      // agregamos lo creado para que quede seleccionable.
+      setDisponibles((actual) =>
+        actual.some((o) => o.id === nuevo.id) ? actual : [...actual, nuevo],
+      )
+      if (seleccionarAlCrear) {
+        if (multiple) {
+          if (!seleccionados.includes(nuevo.id)) onChange([...seleccionados, nuevo.id], nuevo)
+        } else {
+          onChange(nuevo.id, nuevo)
+        }
       }
       setQuery('')
       setAbierto(false)

@@ -3,15 +3,18 @@ import { useNavigate } from 'react-router-dom'
 import { useAuth } from '@/context/AuthContext.jsx'
 import { useToast } from '@/components/ui/Toast.jsx'
 import * as perfilRepo from '@/lib/data/perfilTrabajador.repo.js'
+import * as oficiosRepo from '@/lib/data/oficios.repo.js'
+import * as subareasRepo from '@/lib/data/subareas.repo.js'
 import { subirAvatar } from '@/lib/data/almacenamiento.js'
 import { calcularCompletitud } from '@/lib/perfil.js'
+import { mensajeError } from '@/lib/errores.js'
 import MapaUbicacion from '@/components/mapa/MapaUbicacion.jsx'
 import Button from '@/components/ui/Button.jsx'
 import Card from '@/components/ui/Card.jsx'
 import Input from '@/components/ui/Input.jsx'
 import Textarea from '@/components/ui/Textarea.jsx'
 import Spinner from '@/components/ui/Spinner.jsx'
-import OficioSelector from './OficioSelector.jsx'
+import OficioPicker from '@/features/oficios/OficioPicker.jsx'
 import AvatarUploader from './AvatarUploader.jsx'
 
 function Completitud({ perfil }) {
@@ -71,24 +74,96 @@ export default function PerfilTrabajador({ modo = 'edicion', onGuardado }) {
   const [longitud, setLongitud] = useState(null)
   const [radioKm, setRadioKm] = useState(10)
   const [oficios, setOficios] = useState([])
+  const [catalogoOficios, setCatalogoOficios] = useState([])
+  const [subareas, setSubareas] = useState([])
+  const [opcionesSubareas, setOpcionesSubareas] = useState({})
 
   useEffect(() => {
     let activo = true
-    perfilRepo.obtener(usuario.id).then((perfil) => {
-      if (!activo) return
-      setDescripcion(perfil.descripcion ?? '')
-      setExperiencia(perfil.experiencia ?? '')
-      setUbicacion(perfil.ubicacion ?? '')
-      setLatitud(perfil.latitud ?? null)
-      setLongitud(perfil.longitud ?? null)
-      setRadioKm(perfil.radioKm ?? 10)
-      setOficios(perfil.oficios ?? [])
-      setCargando(false)
-    })
+    Promise.all([
+      perfilRepo.obtener(usuario.id),
+      oficiosRepo.listarVisibles(),
+      subareasRepo.listarDelTrabajador(usuario.id),
+    ])
+      .then(([perfil, catalogo, misSubareas]) => {
+        if (!activo) return
+        setDescripcion(perfil.descripcion ?? '')
+        setExperiencia(perfil.experiencia ?? '')
+        setUbicacion(perfil.ubicacion ?? '')
+        setLatitud(perfil.latitud ?? null)
+        setLongitud(perfil.longitud ?? null)
+        setRadioKm(perfil.radioKm ?? 10)
+        setOficios(perfil.oficios ?? [])
+        setCatalogoOficios(catalogo)
+        setSubareas(
+          (misSubareas ?? [])
+            .filter((s) => s.estado === 'activo')
+            .map((s) => ({
+              id: s.id,
+              nombre: s.nombre,
+              oficioId: s.oficioId,
+            })),
+        )
+        setCargando(false)
+      })
+      .catch(() => activo && setCargando(false))
     return () => {
       activo = false
     }
   }, [usuario.id])
+
+  useEffect(() => {
+    let activo = true
+    if (oficios.length === 0) {
+      setOpcionesSubareas({})
+      return undefined
+    }
+    Promise.all(
+      oficios.map((id) => subareasRepo.listarVisibles(id).then((lista) => [id, lista])),
+    )
+      .then((entradas) => {
+        if (activo) setOpcionesSubareas(Object.fromEntries(entradas))
+      })
+      .catch(() => {})
+    return () => {
+      activo = false
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [oficios.join(',')])
+
+  function cambiarOficios(nuevos) {
+    setOficios(nuevos)
+    const permitidos = new Set(nuevos)
+    setSubareas((actual) => actual.filter((s) => permitidos.has(s.oficioId)))
+  }
+
+  function cambiarSubareas(oficioId, ids, oficioCreado) {
+    setSubareas((actual) => {
+      const sinOficio = actual.filter((s) => s.oficioId !== oficioId)
+      return [
+        ...sinOficio,
+        ...ids.map((id) => {
+          const previa = actual.find((s) => s.id === id)
+          if (previa) return previa
+          const opcion = (opcionesSubareas[oficioId] ?? []).find((o) => o.id === id)
+          return {
+            id,
+            nombre: opcion?.nombre ?? oficioCreado?.nombre ?? 'Especialidad',
+            oficioId,
+          }
+        }),
+      ]
+    })
+  }
+
+  async function crearSubarea(oficioId, nombre) {
+    const nuevo = await subareasRepo.crear(oficioId, nombre)
+    setOpcionesSubareas((actual) => ({
+      ...actual,
+      [oficioId]: [...(actual[oficioId] ?? []), nuevo],
+    }))
+    return nuevo
+  }
 
   async function guardar() {
     setError('')
@@ -111,11 +186,12 @@ export default function PerfilTrabajador({ modo = 'edicion', onGuardado }) {
         longitud,
         radioKm: Math.min(100, Math.max(1, Number(radioKm) || 10)),
         oficios,
+        subareas,
       })
       mostrar('Perfil actualizado.', 'exito')
       onGuardado?.()
-    } catch {
-      setError('No pudimos guardar los cambios. Intentá de nuevo.')
+    } catch (err) {
+      setError(mensajeError(err))
     } finally {
       setGuardando(false)
     }
@@ -214,9 +290,48 @@ export default function PerfilTrabajador({ modo = 'edicion', onGuardado }) {
             </div>
           </Card>
 
-          <Card>
-            <h2 className="mb-3 font-bold">Oficios</h2>
-            <OficioSelector value={oficios} onChange={setOficios} />
+          <Card className="space-y-4">
+            <div>
+              <h2 className="mb-3 font-bold">Oficios</h2>
+              <OficioPicker value={oficios} onChange={cambiarOficios} multiple />
+            </div>
+
+            {oficios.length > 0 && (
+              <div className="space-y-3 border-t border-line pt-4">
+                <div>
+                  <h2 className="font-bold">Especialidades (opcional)</h2>
+                  <p className="mt-1 text-xs text-muted">
+                    Contá qué subáreas de cada oficio hacés. Podés proponer una nueva: quedará
+                    pendiente de aprobación.
+                  </p>
+                </div>
+
+                {oficios.map((oficioId) => {
+                  const nombreOficio =
+                    catalogoOficios.find((o) => o.id === oficioId)?.nombre ?? 'Oficio'
+                  const ids = subareas
+                    .filter((s) => s.oficioId === oficioId)
+                    .map((s) => s.id)
+                  return (
+                    <div key={oficioId} className="rounded-xl bg-canvas p-3">
+                      <p className="mb-2 text-sm font-bold text-ink">{nombreOficio}</p>
+                      <OficioPicker
+                        multiple
+                        value={ids}
+                        onChange={(nuevosIds, oficioCreado) =>
+                          cambiarSubareas(oficioId, nuevosIds, oficioCreado)
+                        }
+                        opciones={opcionesSubareas[oficioId] ?? []}
+                        crear={(nombre) => crearSubarea(oficioId, nombre)}
+                        seleccionarAlCrear={false}
+                        placeholder="Buscar o proponer una especialidad…"
+                        ayuda="Las que propongas quedan pendientes: podés usarlas cuando el admin las apruebe."
+                      />
+                    </div>
+                  )
+                })}
+              </div>
+            )}
           </Card>
 
           {error && <p className="text-sm font-semibold text-danger">{error}</p>}

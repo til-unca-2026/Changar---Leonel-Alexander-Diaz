@@ -30,7 +30,7 @@ export async function obtenerBase(id) {
 }
 
 export async function obtenerTrabajador(id) {
-  const [base, pt, relaciones, portfolio] = await Promise.all([
+  const [base, pt, relaciones, subareas, portfolio] = await Promise.all([
     obtenerBase(id),
     supabase
       .from('perfiles_trabajador')
@@ -40,6 +40,10 @@ export async function obtenerTrabajador(id) {
     supabase
       .from('trabajador_oficios')
       .select('oficio_id, oficios(nombre, estado)')
+      .eq('trabajador_id', id),
+    supabase
+      .from('trabajador_subareas')
+      .select('subarea_id, oficio_subareas(nombre, estado, oficios(nombre, estado))')
       .eq('trabajador_id', id),
     supabase
       .from('portfolio_fotos')
@@ -59,6 +63,14 @@ export async function obtenerTrabajador(id) {
     oficios: (relaciones.data ?? [])
       .filter((r) => r.oficios?.estado === 'activo')
       .map((r) => r.oficios.nombre),
+    subareas: (subareas.data ?? [])
+      .filter((s) => s.oficio_subareas?.estado === 'activo')
+      .filter((s) => s.oficio_subareas?.oficios?.estado === 'activo')
+      .map((s) => ({
+        id: s.subarea_id,
+        nombre: s.oficio_subareas?.nombre ?? '',
+        oficioNombre: s.oficio_subareas?.oficios?.nombre ?? '',
+      })),
     portfolio: (portfolio.data ?? []).map((p) => ({
       url: urlPublica('portfolio-fotos', p.storage_path),
       descripcion: p.descripcion ?? '',

@@ -14,6 +14,9 @@ const ETIQUETAS = {
   oficio_pendiente: 'Nuevo oficio pendiente de aprobación',
   oficio_aprobado: 'Tu oficio fue aprobado',
   oficio_rechazado: 'Tu oficio fue rechazado',
+  subarea_pendiente: 'Nueva especialidad pendiente de aprobación',
+  subarea_aprobada: 'Tu especialidad fue aprobada',
+  subarea_rechazada: 'Tu especialidad fue rechazada',
   cuenta_bloqueada: 'Tu cuenta fue bloqueada',
   cuenta_suspendida: 'Tu cuenta fue suspendida',
   reporte_nuevo: 'Nuevo reporte de perfil',
@@ -47,9 +50,12 @@ export function destino(tipo, ref, rol) {
     case 'nueva_valoracion':
       return `${base}/contrataciones/${ref}`
     case 'oficio_pendiente':
+    case 'subarea_pendiente':
       return '/admin/oficios'
     case 'oficio_aprobado':
     case 'oficio_rechazado':
+    case 'subarea_aprobada':
+    case 'subarea_rechazada':
       return '/trabajador/perfil'
     case 'reporte_nuevo':
     case 'contrato_reportado':

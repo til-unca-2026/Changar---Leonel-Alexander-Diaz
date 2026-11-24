@@ -13,6 +13,10 @@ const MENSAJES = {
   oficio_no_permitido: 'Ese oficio no está permitido.',
   oficio_no_encontrado: 'El oficio no existe.',
   oficio_duplicado: 'Ya existe un oficio con ese nombre.',
+  subarea_no_disponible: 'Esa especialidad no está disponible para tus oficios.',
+  subarea_no_permitida: 'Esa especialidad no está disponible.',
+  subarea_no_encontrado: 'La especialidad no existe.',
+  subarea_duplicada: 'Ya existe esa especialidad en el oficio.',
   solicitud_no_encontrada: 'La solicitud no existe.',
   solicitud_no_abierta: 'La solicitud ya no acepta propuestas.',
   perfil_incompleto:
@@ -76,6 +80,10 @@ export function mensajeError(error) {
   if (/oficio_no_permitido/i.test(codigo)) return MENSAJES.oficio_no_permitido
   if (/oficio_no_encontrado/i.test(codigo)) return MENSAJES.oficio_no_encontrado
   if (/oficio_duplicado/i.test(codigo)) return MENSAJES.oficio_duplicado
+  if (/subarea_no_disponible/i.test(codigo)) return MENSAJES.subarea_no_disponible
+  if (/subarea_no_permitida/i.test(codigo)) return MENSAJES.subarea_no_permitida
+  if (/subarea_no_encontrado/i.test(codigo)) return MENSAJES.subarea_no_encontrado
+  if (/subarea_duplicada/i.test(codigo)) return MENSAJES.subarea_duplicada
   if (/solicitud_no_abierta/i.test(codigo)) return MENSAJES.solicitud_no_abierta
   if (/solicitud_no_encontrada/i.test(codigo)) return MENSAJES.solicitud_no_encontrada
   if (/perfil_incompleto/i.test(codigo)) return MENSAJES.perfil_incompleto
