@@ -23,6 +23,7 @@ import PerfilTrabajadorPage from '@/features/trabajador/Perfil.jsx'
 import Portfolio from '@/features/trabajador/Portfolio.jsx'
 import AdminDashboard from '@/features/admin/Dashboard.jsx'
 import AdminOficios from '@/features/admin/Oficios.jsx'
+import AdminActividad from '@/features/admin/Actividad.jsx'
 import AdminUsuarios from '@/features/admin/Usuarios.jsx'
 import AdminReportes from '@/features/admin/Reportes.jsx'
 import AdminExplorar from '@/features/admin/Explorar.jsx'
@@ -84,6 +85,7 @@ export default function App() {
         <Route element={<AppLayout />}>
           <Route path="/admin" element={<AdminDashboard />} />
           <Route path="/admin/oficios" element={<AdminOficios />} />
+          <Route path="/admin/actividad" element={<AdminActividad />} />
           <Route path="/admin/usuarios" element={<AdminUsuarios />} />
           <Route path="/admin/reportes" element={<AdminReportes />} />
           <Route path="/admin/explorar" element={<AdminExplorar />} />
