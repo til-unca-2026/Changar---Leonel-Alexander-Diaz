@@ -2,21 +2,75 @@ import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { useAuth } from '@/context/AuthContext.jsx'
 import { useToast } from '@/components/ui/Toast.jsx'
+import * as adminRepo from '@/lib/data/admin.repo.js'
 import * as perfilesRepo from '@/lib/data/perfiles.repo.js'
 import * as valoracionesRepo from '@/lib/data/valoraciones.repo.js'
+import * as contratacionesRepo from '@/lib/data/contrataciones.repo.js'
 import { mensajeError } from '@/lib/errores.js'
 import { fechaRelativa } from '@/lib/format.js'
 import Avatar from '@/components/ui/Avatar.jsx'
 import Badge from '@/components/ui/Badge.jsx'
 import Button from '@/components/ui/Button.jsx'
 import Card from '@/components/ui/Card.jsx'
+import ConfirmarAccion from '@/components/ui/ConfirmarAccion.jsx'
 import Spinner from '@/components/ui/Spinner.jsx'
 import Textarea from '@/components/ui/Textarea.jsx'
+import MapaUbicacion from '@/components/mapa/MapaUbicacion.jsx'
+import TelefonoContacto from '@/components/TelefonoContacto.jsx'
 
 const ROL = {
   cliente: 'Cliente',
   trabajador: 'Trabajador',
   admin: 'Administrador',
+}
+
+/** Etiquetas del historial de sanciones. */
+const ETIQUETA_SANCION = {
+  suspension: 'Suspensión',
+  bloqueo: 'Bloqueo permanente',
+  marca: 'Advertencia',
+}
+
+/** Acciones de sanción disponibles para administradores. */
+const ACCIONES_GESTION = {
+  ban7: {
+    titulo: 'Suspender 7 días',
+    mensaje: 'La cuenta quedará suspendida 7 días: no podrá recibir solicitudes.',
+    textoConfirmar: 'Suspender 7 días',
+    varianteConfirmar: 'outline',
+    dias: 7,
+    motivo: true,
+  },
+  ban30: {
+    titulo: 'Suspender 30 días',
+    mensaje: 'La cuenta quedará suspendida 30 días: no podrá recibir solicitudes.',
+    textoConfirmar: 'Suspender 30 días',
+    varianteConfirmar: 'outline',
+    dias: 30,
+    motivo: true,
+  },
+  ban: {
+    titulo: 'Banear permanentemente',
+    mensaje:
+      'La cuenta quedará bloqueada. Se cancelan sus solicitudes abiertas y se retiran sus propuestas enviadas.',
+    textoConfirmar: 'Banear',
+    varianteConfirmar: 'danger',
+    dias: null,
+    motivo: true,
+  },
+  marcar: {
+    titulo: 'Marcar perfil',
+    mensaje: 'Se registrará una advertencia privada en el historial del perfil.',
+    textoConfirmar: 'Marcar',
+    varianteConfirmar: 'primary',
+    motivo: true,
+  },
+  reactivar: {
+    titulo: 'Reactivar cuenta',
+    mensaje: 'La cuenta volverá a estar habilitada y podrá operar con normalidad.',
+    textoConfirmar: 'Reactivar',
+    varianteConfirmar: 'primary',
+  },
 }
 
 function Galeria({ fotos }) {
@@ -59,6 +113,11 @@ export default function PublicProfile() {
   const [reportando, setReportando] = useState(false)
   const [motivoReporte, setMotivoReporte] = useState('')
   const [enviandoReporte, setEnviandoReporte] = useState(false)
+  const [historial, setHistorial] = useState([])
+  const [accion, setAccion] = useState(null)
+  const [aplicando, setAplicando] = useState(false)
+  const [recarga, setRecarga] = useState(0)
+  const [telefono, setTelefono] = useState(null)
 
   useEffect(() => {
     let activo = true
@@ -101,7 +160,50 @@ export default function PublicProfile() {
     return () => {
       activo = false
     }
-  }, [id])
+  }, [id, recarga])
+
+  // El teléfono solo es legible (RLS) si hay una contratación en curso o
+  // completada entre el visitante y la dueña del perfil. Los admin tienen
+  // permiso de lectura general, pero acá no tienen contexto que justificar.
+  useEffect(() => {
+    if (!usuario?.id || usuario.id === id || usuario.rol === 'admin') {
+      setTelefono(null)
+      return undefined
+    }
+    let activo = true
+    contratacionesRepo
+      .contacto(id)
+      .then((tel) => activo && setTelefono(tel))
+      .catch(() => activo && setTelefono(null))
+    return () => {
+      activo = false
+    }
+  }, [id, usuario?.id, recarga])
+
+  const esAdmin = usuario?.rol === 'admin'
+  const esSuperadmin = Boolean(usuario?.esSuperadmin)
+  const puedeGestionar =
+    esAdmin &&
+    Boolean(perfil) &&
+    perfil.id !== usuario?.id &&
+    !perfil.esSuperadmin &&
+    (perfil.rol !== 'admin' || esSuperadmin)
+
+  useEffect(() => {
+    if (!puedeGestionar) {
+      setHistorial([])
+      return undefined
+    }
+
+    let activo = true
+    adminRepo
+      .sancionesDe(id)
+      .then((h) => activo && setHistorial(h))
+      .catch(() => activo && setHistorial([]))
+    return () => {
+      activo = false
+    }
+  }, [id, puedeGestionar, recarga])
 
   async function enviarReporte() {
     if (!motivoReporte.trim()) {
@@ -118,6 +220,30 @@ export default function PublicProfile() {
       mostrar(mensajeError(err), 'error')
     } finally {
       setEnviandoReporte(false)
+    }
+  }
+
+  async function confirmarGestion(motivo) {
+    if (!accion || !perfil) return
+    const definicion = ACCIONES_GESTION[accion]
+    setAplicando(true)
+    try {
+      if (accion === 'reactivar') {
+        await adminRepo.desbanear(perfil.id)
+        mostrar('Cuenta reactivada.', 'exito')
+      } else if (accion === 'marcar') {
+        await adminRepo.marcar(perfil.id, motivo)
+        mostrar('Advertencia aplicada.', 'exito')
+      } else {
+        await adminRepo.banear(perfil.id, definicion.dias, motivo)
+        mostrar(definicion.dias ? 'Cuenta suspendida.' : 'Cuenta bloqueada.', 'exito')
+      }
+      setAccion(null)
+      setRecarga((n) => n + 1)
+    } catch (err) {
+      mostrar(mensajeError(err), 'error')
+    } finally {
+      setAplicando(false)
     }
   }
 
@@ -237,7 +363,39 @@ export default function PublicProfile() {
                 <p className="mt-1 whitespace-pre-line text-sm text-muted">{perfil.experiencia}</p>
               </div>
             )}
-            {perfil.ubicacion && <p className="text-sm text-muted">📍 {perfil.ubicacion}</p>}
+            {perfil.ubicacion && (
+              <p className="text-sm text-muted">
+                📍 {perfil.ubicacion}
+                {perfil.latitud != null && Number(perfil.radioKm) > 0
+                  ? ` · cobertura ${perfil.radioKm} km`
+                  : ''}
+              </p>
+            )}
+            {perfil.latitud != null && perfil.longitud != null && (
+              <MapaUbicacion
+                label="Zona de trabajo"
+                valor={{
+                  texto: perfil.ubicacion,
+                  lat: perfil.latitud,
+                  lng: perfil.longitud,
+                }}
+                modo="punto"
+                radioKm={perfil.radioKm}
+                soloLectura
+                altura="h-48"
+              />
+            )}
+            {telefono && (
+              <div>
+                <h3 className="text-sm font-bold">Teléfono</h3>
+                <p className="mt-0.5 text-xs text-muted">
+                  Lo ves porque tienen una contratación en curso o completada.
+                </p>
+                <div className="mt-2">
+                  <TelefonoContacto telefono={telefono} nombre={perfil.nombre} />
+                </div>
+              </div>
+            )}
           </Card>
 
           {perfil.oficios?.length > 0 && (
@@ -280,6 +438,29 @@ export default function PublicProfile() {
             <div>
               <h2 className="font-bold">Zona</h2>
               <p className="mt-1 text-sm text-ink">{perfil.zona}</p>
+            </div>
+          )}
+          {perfil.latitud != null && perfil.longitud != null && (
+            <MapaUbicacion
+              label="Zona aproximada"
+              valor={{
+                texto: perfil.zona,
+                lat: perfil.latitud,
+                lng: perfil.longitud,
+              }}
+              soloLectura
+              altura="h-48"
+            />
+          )}
+          {telefono && (
+            <div>
+              <h2 className="font-bold">Teléfono</h2>
+              <p className="mt-0.5 text-xs text-muted">
+                Lo ves porque tienen una contratación en curso o completada.
+              </p>
+              <div className="mt-2">
+                <TelefonoContacto telefono={telefono} nombre={perfil.nombre} />
+              </div>
             </div>
           )}
           {perfil.descripcion && (
@@ -428,7 +609,113 @@ export default function PublicProfile() {
         </section>
       )}
 
-      {perfil.id !== usuario?.id && (
+      {/* Gestión de administración: reemplaza al reporte para admin/superadmin */}
+      {puedeGestionar && (
+        <Card className="space-y-4">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <h2 className="font-bold">Gestión de la cuenta</h2>
+              <p className="mt-1 text-sm text-muted">
+                Sanciones y advertencias de administración.
+              </p>
+            </div>
+            {perfil.activo === false ? (
+              <Badge estado="cancelado">Baneado</Badge>
+            ) : perfil.suspendidoHasta && new Date(perfil.suspendidoHasta) > new Date() ? (
+              <Badge estado="asignada">Suspendido</Badge>
+            ) : (
+              <Badge estado="activo">Activo</Badge>
+            )}
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            {perfil.habilitado ? (
+              <>
+                <Button
+                  variante="outline"
+                  className="px-3 py-2 text-sm"
+                  onClick={() => setAccion('ban7')}
+                >
+                  Suspender 7 días
+                </Button>
+                <Button
+                  variante="outline"
+                  className="px-3 py-2 text-sm"
+                  onClick={() => setAccion('ban30')}
+                >
+                  Suspender 30 días
+                </Button>
+                <Button
+                  variante="danger"
+                  className="px-3 py-2 text-sm"
+                  onClick={() => setAccion('ban')}
+                >
+                  Banear
+                </Button>
+              </>
+            ) : (
+              <Button className="px-3 py-2 text-sm" onClick={() => setAccion('reactivar')}>
+                Reactivar
+              </Button>
+            )}
+            <Button
+              variante="outline"
+              className="px-3 py-2 text-sm"
+              onClick={() => setAccion('marcar')}
+            >
+              Marcar
+            </Button>
+          </div>
+
+          <div>
+            <h3 className="text-sm font-bold uppercase tracking-wide text-muted">
+              Historial de sanciones
+            </h3>
+            {historial.length === 0 ? (
+              <p className="mt-2 text-sm text-muted">Sin sanciones ni advertencias.</p>
+            ) : (
+              <ul className="mt-2 space-y-2">
+                {historial.map((h) => (
+                  <li
+                    key={h.id}
+                    className="rounded-xl border border-line bg-canvas px-3 py-2"
+                  >
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <span className="text-sm font-bold text-ink">
+                        {ETIQUETA_SANCION[h.tipo] ?? h.tipo}
+                      </span>
+                      <span className="text-xs text-muted">{fechaRelativa(h.createdAt)}</span>
+                    </div>
+                    <p className="mt-1 whitespace-pre-line text-sm text-ink">
+                      {h.motivo || 'Sin motivo registrado.'}
+                    </p>
+                    {h.aplicadaPor && (
+                      <p className="mt-1 text-xs text-muted">Aplicada por {h.aplicadaPor}</p>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </Card>
+      )}
+
+      {puedeGestionar && (
+        <ConfirmarAccion
+          abierto={Boolean(accion)}
+          titulo={accion ? ACCIONES_GESTION[accion].titulo : ''}
+          mensaje={accion ? ACCIONES_GESTION[accion].mensaje : ''}
+          motivoRequerido={Boolean(accion && ACCIONES_GESTION[accion].motivo)}
+          etiquetaMotivo="Motivo de la sanción"
+          textoConfirmar={accion ? ACCIONES_GESTION[accion].textoConfirmar : 'Confirmar'}
+          varianteConfirmar={accion ? ACCIONES_GESTION[accion].varianteConfirmar : 'primary'}
+          cargando={aplicando}
+          onConfirmar={confirmarGestion}
+          onCancelar={() => setAccion(null)}
+        />
+      )}
+
+      {!esAdmin && perfil.rol !== 'admin' && perfil.id !== usuario?.id && (
         <Card>
           {reportando ? (
             <div className="space-y-3">

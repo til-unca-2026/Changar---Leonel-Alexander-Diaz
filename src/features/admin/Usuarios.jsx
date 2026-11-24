@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
 import { useAuth } from '@/context/AuthContext.jsx'
 import { useToast } from '@/components/ui/Toast.jsx'
 import * as adminRepo from '@/lib/data/admin.repo.js'
@@ -8,11 +7,92 @@ import Avatar from '@/components/ui/Avatar.jsx'
 import Badge from '@/components/ui/Badge.jsx'
 import Button from '@/components/ui/Button.jsx'
 import Card from '@/components/ui/Card.jsx'
+import ConfirmarAccion from '@/components/ui/ConfirmarAccion.jsx'
 import Input from '@/components/ui/Input.jsx'
 import Select from '@/components/ui/Select.jsx'
 import Spinner from '@/components/ui/Spinner.jsx'
 
 const ROL = { cliente: 'Cliente', trabajador: 'Trabajador', admin: 'Administrador' }
+
+const ESTADO_INVITACION = {
+  pendiente: { etiqueta: 'Pendiente', estado: 'asignada' },
+  aceptada: { etiqueta: 'Aceptada', estado: 'activo' },
+  cancelada: { etiqueta: 'Cancelada', estado: 'cancelado' },
+  expirada: { etiqueta: 'Vencida', estado: 'cancelado' },
+}
+
+/** Diálogos de sanción: textos y configuración de cada acción. */
+const DIALOGOS = {
+  marcar: {
+    titulo: 'Marcar perfil',
+    mensaje: (u) =>
+      `Se registrará una advertencia privada en el historial de ${u.nombre} ${u.apellido}.`,
+    textoConfirmar: 'Marcar',
+    varianteConfirmar: 'primary',
+    motivo: true,
+    ok: 'Marca de advertencia aplicada.',
+  },
+  ban7: {
+    titulo: 'Suspender 7 días',
+    mensaje: (u) =>
+      `Se suspenderá a ${u.nombre} ${u.apellido} por 7 días: no podrá recibir solicitudes.`,
+    textoConfirmar: 'Suspender 7 días',
+    varianteConfirmar: 'outline',
+    motivo: true,
+    ok: 'Cuenta suspendida.',
+  },
+  ban30: {
+    titulo: 'Suspender 30 días',
+    mensaje: (u) =>
+      `Se suspenderá a ${u.nombre} ${u.apellido} por 30 días: no podrá recibir solicitudes.`,
+    textoConfirmar: 'Suspender 30 días',
+    varianteConfirmar: 'outline',
+    motivo: true,
+    ok: 'Cuenta suspendida.',
+  },
+  ban: {
+    titulo: 'Banear permanentemente',
+    mensaje: (u) =>
+      `Se bloqueará la cuenta de ${u.nombre} ${u.apellido}. Se cancelan sus solicitudes abiertas y se retiran sus propuestas enviadas.`,
+    textoConfirmar: 'Banear',
+    varianteConfirmar: 'danger',
+    motivo: true,
+    ok: 'Cuenta bloqueada.',
+  },
+  desbanear: {
+    titulo: 'Reactivar cuenta',
+    mensaje: (u) =>
+      `La cuenta de ${u.nombre} ${u.apellido} volverá a estar habilitada y podrá operar con normalidad.`,
+    textoConfirmar: 'Reactivar',
+    varianteConfirmar: 'primary',
+    motivo: false,
+    ok: 'Cuenta reactivada.',
+  },
+}
+
+const DIAS_DIALOGO = { ban7: 7, ban30: 30, ban: null }
+
+/** Link de registro de una invitación de administrador. */
+function linkDeInvitacion(token) {
+  return `${window.location.origin}/registro?invitacion=${token}`
+}
+
+function CopiarLink({ token, onCopiado }) {
+  async function copiar() {
+    try {
+      await navigator.clipboard.writeText(linkDeInvitacion(token))
+      onCopiado()
+    } catch {
+      // sin permiso de portapapeles: el link queda visible para copiar a mano
+      onCopiado(false)
+    }
+  }
+  return (
+    <Button variante="outline" className="px-3 py-2 text-sm" onClick={copiar}>
+      Copiar link
+    </Button>
+  )
+}
 
 export default function Usuarios() {
   const { usuario } = useAuth()
@@ -22,13 +102,31 @@ export default function Usuarios() {
   const [busqueda, setBusqueda] = useState('')
   const [filtroRol, setFiltroRol] = useState('todos')
   const [filtroEstado, setFiltroEstado] = useState('todos')
-  const [marcando, setMarcando] = useState(null)
-  const [motivo, setMotivo] = useState('')
-  const [accionando, setAccionando] = useState(null)
+  const [dialogo, setDialogo] = useState(null)
+  const [procesandoDialogo, setProcesandoDialogo] = useState(false)
+
+  const esDueño = Boolean(usuario?.esSuperadmin)
+  const [invitaciones, setInvitaciones] = useState([])
+  const [cargandoInvitaciones, setCargandoInvitaciones] = useState(false)
+  const [creandoInvitacion, setCreandoInvitacion] = useState(false)
+  const [formInvitacion, setFormInvitacion] = useState({ email: '', nombre: '', apellido: '' })
+  const [ultimaInvitacion, setUltimaInvitacion] = useState(null)
 
   async function recargar() {
     setUsuarios(await adminRepo.listarUsuarios())
     setCargando(false)
+  }
+
+  async function recargarInvitaciones() {
+    if (!esDueño) return
+    setCargandoInvitaciones(true)
+    try {
+      setInvitaciones(await adminRepo.listarInvitaciones())
+    } catch (err) {
+      mostrar(mensajeError(err), 'error')
+    } finally {
+      setCargandoInvitaciones(false)
+    }
   }
 
   useEffect(() => {
@@ -36,8 +134,15 @@ export default function Usuarios() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  useEffect(() => {
+    recargarInvitaciones()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [esDueño])
+
   const filtrados = useMemo(() => {
     return usuarios.filter((u) => {
+      // Un administrador normal no ve cuentas de administrador.
+      if (!esDueño && u.rol === 'admin') return false
       if (busqueda) {
         const q = busqueda.toLowerCase()
         const nombre = `${u.nombre} ${u.apellido}`.toLowerCase()
@@ -53,7 +158,7 @@ export default function Usuarios() {
       }
       return true
     })
-  }, [usuarios, busqueda, filtroRol, filtroEstado])
+  }, [usuarios, busqueda, filtroRol, filtroEstado, esDueño])
 
   async function aplicar(fn, okMsg) {
     try {
@@ -62,36 +167,70 @@ export default function Usuarios() {
       await recargar()
     } catch (err) {
       mostrar(mensajeError(err), 'error')
-    } finally {
-      setAccionando(null)
     }
   }
 
-  function banear(u, dias) {
-    if (!window.confirm(dias ? `Suspender a ${u.nombre} por ${dias} días?` : `BLOQUEAR permanentemente a ${u.nombre}?`)) return
-    setAccionando(u.id)
-    aplicar(() => adminRepo.banear(u.id, dias), dias ? 'Cuenta suspendida.' : 'Cuenta bloqueada.')
+  function abrirDialogo(tipo, u) {
+    setDialogo({ tipo, usuario: u })
   }
 
-  function desbanear(u) {
-    setAccionando(u.id)
-    aplicar(() => adminRepo.desbanear(u.id), 'Cuenta reactivada.')
+  async function confirmarDialogo(motivoSancion) {
+    if (!dialogo) return
+    const { tipo, usuario: u } = dialogo
+    const config = DIALOGOS[tipo]
+    setProcesandoDialogo(true)
+    try {
+      if (tipo === 'desbanear') {
+        await adminRepo.desbanear(u.id)
+      } else if (tipo === 'marcar') {
+        await adminRepo.marcar(u.id, motivoSancion)
+      } else {
+        await adminRepo.banear(u.id, DIAS_DIALOGO[tipo], motivoSancion)
+      }
+      mostrar(config.ok, 'exito')
+      setDialogo(null)
+      await recargar()
+    } catch (err) {
+      mostrar(mensajeError(err), 'error')
+    } finally {
+      setProcesandoDialogo(false)
+    }
   }
 
   function cambiarRol(u, rol) {
-    setAccionando(u.id)
     aplicar(() => adminRepo.cambiarRol(u.id, rol), 'Rol actualizado.')
   }
 
-  function marcar(u) {
-    if (!motivo.trim()) {
-      mostrar('Escribí el motivo de la advertencia.', 'error')
+  async function crearInvitacion(e) {
+    e.preventDefault()
+    const { email, nombre, apellido } = formInvitacion
+    if (!email.trim()) {
+      mostrar('Ingresá el email de quien vas a invitar.', 'error')
       return
     }
-    setAccionando(u.id)
-    aplicar(() => adminRepo.marcar(u.id, motivo), 'Marca de advertencia aplicada.')
-    setMarcando(null)
-    setMotivo('')
+    setCreandoInvitacion(true)
+    try {
+      const inv = await adminRepo.crearInvitacion({ email, nombre, apellido })
+      setUltimaInvitacion(inv)
+      setFormInvitacion({ email: '', nombre: '', apellido: '' })
+      mostrar('Invitación generada. Compartí el link con la persona invitada.', 'exito')
+      await recargarInvitaciones()
+    } catch (err) {
+      mostrar(mensajeError(err), 'error')
+    } finally {
+      setCreandoInvitacion(false)
+    }
+  }
+
+  async function cancelarInvitacion(inv) {
+    if (!window.confirm(`Cancelar la invitación para ${inv.email}?`)) return
+    try {
+      await adminRepo.cancelarInvitacion(inv.id)
+      mostrar('Invitación cancelada.', 'exito')
+      await recargarInvitaciones()
+    } catch (err) {
+      mostrar(mensajeError(err), 'error')
+    }
   }
 
   if (cargando) {
@@ -109,6 +248,127 @@ export default function Usuarios() {
         <p className="mt-1 text-muted">Gestioná cuentas, sanciones y roles.</p>
       </div>
 
+      {esDueño && (
+        <Card className="space-y-4">
+          <div>
+            <h2 className="font-bold">Crear administrador</h2>
+            <p className="mt-1 text-sm text-muted">
+              Generás un link de un solo uso y lo compartís con la persona invitada. Ella crea su
+              cuenta con su propia contraseña y entra directo al panel.
+            </p>
+          </div>
+
+          <form onSubmit={crearInvitacion} className="grid gap-3 sm:grid-cols-3">
+            <Input
+              label="Email"
+              type="email"
+              value={formInvitacion.email}
+              onChange={(e) =>
+                setFormInvitacion((f) => ({ ...f, email: e.target.value }))
+              }
+              placeholder="admin@changar.com"
+            />
+            <Input
+              label="Nombre"
+              value={formInvitacion.nombre}
+              onChange={(e) =>
+                setFormInvitacion((f) => ({ ...f, nombre: e.target.value }))
+              }
+              placeholder="Ana"
+            />
+            <Input
+              label="Apellido"
+              value={formInvitacion.apellido}
+              onChange={(e) =>
+                setFormInvitacion((f) => ({ ...f, apellido: e.target.value }))
+              }
+              placeholder="Gómez"
+            />
+            <div className="sm:col-span-3">
+              <Button tipo="submit" disabled={creandoInvitacion}>
+                {creandoInvitacion ? 'Generando…' : 'Generar invitación'}
+              </Button>
+            </div>
+          </form>
+
+          {ultimaInvitacion && (
+            <div className="rounded-xl border border-primary/30 bg-primary-soft p-4">
+              <p className="font-bold text-primary">Invitación para {ultimaInvitacion.email}</p>
+              <p className="mt-1 break-all text-sm text-ink">{linkDeInvitacion(ultimaInvitacion.token)}</p>
+              <p className="mt-1 text-xs text-muted">
+                Vence el {new Date(ultimaInvitacion.expira_at).toLocaleDateString('es-AR')} y se
+                puede usar una sola vez.
+              </p>
+              <div className="mt-3">
+                <CopiarLink
+                  token={ultimaInvitacion.token}
+                  onCopiado={(ok = true) =>
+                    mostrar(ok ? 'Link copiado.' : 'Copiá el link manualmente.', ok ? 'exito' : 'info')
+                  }
+                />
+              </div>
+            </div>
+          )}
+
+          <div>
+            <h3 className="text-sm font-bold uppercase tracking-wide text-muted">Invitaciones</h3>
+            {cargandoInvitaciones ? (
+              <div className="mt-3 flex justify-center py-6 text-primary">
+                <Spinner className="h-6 w-6" />
+              </div>
+            ) : invitaciones.length === 0 ? (
+              <p className="mt-2 text-sm text-muted">Todavía no generaste ninguna invitación.</p>
+            ) : (
+              <div className="mt-3 space-y-2">
+                {invitaciones.map((inv) => {
+                  const est = ESTADO_INVITACION[inv.estado] ?? {
+                    etiqueta: inv.estado,
+                    estado: 'neutral',
+                  }
+                  return (
+                    <div
+                      key={inv.id}
+                      className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-line bg-surface px-4 py-3"
+                    >
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-semibold text-ink">{inv.email}</p>
+                        <p className="truncate text-xs text-muted">
+                          {[inv.nombre, inv.apellido].filter(Boolean).join(' ') || 'Sin nombre'} ·
+                          creada por {inv.creadoPorNombre || '—'}
+                        </p>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Badge estado={est.estado}>{est.etiqueta}</Badge>
+                        {inv.estado === 'pendiente' && (
+                          <>
+                            <CopiarLink
+                              token={inv.token}
+                              onCopiado={(ok = true) =>
+                                mostrar(
+                                  ok ? 'Link copiado.' : 'Copiá el link manualmente.',
+                                  ok ? 'exito' : 'info'
+                                )
+                              }
+                            />
+                            <Button
+                              variante="danger"
+                              className="px-3 py-2 text-sm"
+                              onClick={() => cancelarInvitacion(inv)}
+                            >
+                              Cancelar
+                            </Button>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+        </Card>
+      )}
+
       <Card className="space-y-3">
         <Input
           placeholder="Buscar por nombre o email…"
@@ -120,7 +380,7 @@ export default function Usuarios() {
             <option value="todos">Todos los roles</option>
             <option value="cliente">Cliente</option>
             <option value="trabajador">Trabajador</option>
-            <option value="admin">Administrador</option>
+            {esDueño && <option value="admin">Administrador</option>}
           </Select>
           <Select value={filtroEstado} onChange={(e) => setFiltroEstado(e.target.value)}>
             <option value="todos">Todos los estados</option>
@@ -153,6 +413,7 @@ export default function Usuarios() {
                       <p className="truncate text-xs text-muted">{u.email}</p>
                       <div className="mt-1 flex flex-wrap items-center gap-2">
                         <Badge estado="neutral">{ROL[u.rol]}</Badge>
+                        {u.esSuperadmin && <Badge estado="activo">Dueño</Badge>}
                         {!u.activo ? (
                           <Badge estado="cancelado">Baneado</Badge>
                         ) : suspendido ? (
@@ -168,60 +429,62 @@ export default function Usuarios() {
                     </div>
                   </div>
 
-                  {!esYo && (
+                  {!esYo && (esDueño || u.rol !== 'admin') && (
                     <div className="flex flex-wrap gap-2">
-                      {marcando === u.id ? (
-                        <div className="flex w-full items-center gap-2">
-                          <Input
-                            placeholder="Motivo de la advertencia"
-                            value={motivo}
-                            onChange={(e) => setMotivo(e.target.value)}
-                            className="flex-1"
-                          />
-                          <Button className="px-3 py-2 text-sm" onClick={() => marcar(u)} disabled={accionando === u.id}>
-                            Aplicar
-                          </Button>
-                          <Button variante="outline" className="px-3 py-2 text-sm" onClick={() => { setMarcando(null); setMotivo('') }}>
-                            ✕
-                          </Button>
-                        </div>
-                      ) : (
+                      <Button
+                        variante="outline"
+                        className="px-3 py-2 text-sm"
+                        onClick={() => abrirDialogo('marcar', u)}
+                      >
+                        Marcar
+                      </Button>
+                      {u.activo && !suspendido ? (
                         <>
-                          <Button variante="outline" className="px-3 py-2 text-sm" onClick={() => { setMarcando(u.id); setMotivo('') }}>
-                            Marcar
+                          <Button
+                            variante="outline"
+                            className="px-3 py-2 text-sm"
+                            onClick={() => abrirDialogo('ban7', u)}
+                          >
+                            7d
                           </Button>
-                          {u.activo && !suspendido ? (
-                            <>
-                              <Button variante="outline" className="px-3 py-2 text-sm" onClick={() => banear(u, 7)} disabled={accionando === u.id}>
-                                7d
-                              </Button>
-                              <Button variante="outline" className="px-3 py-2 text-sm" onClick={() => banear(u, 30)} disabled={accionando === u.id}>
-                                30d
-                              </Button>
-                              <Button variante="danger" className="px-3 py-2 text-sm" onClick={() => banear(u, null)} disabled={accionando === u.id}>
-                                Ban
-                              </Button>
-                            </>
-                          ) : (
-                            <Button className="px-3 py-2 text-sm" onClick={() => desbanear(u)} disabled={accionando === u.id}>
-                              Desbanear
-                            </Button>
-                          )}
-                          {u.rol !== 'admin' ? (
-                            <Select
-                              className="w-auto"
-                              value=""
-                              onChange={(e) => e.target.value && cambiarRol(u, e.target.value)}
-                            >
-                              <option value="">Rol…</option>
-                              <option value="cliente">Cliente</option>
-                              <option value="trabajador">Trabajador</option>
-                              <option value="admin">Admin</option>
-                            </Select>
-                          ) : (
-                            <span className="text-xs text-muted">Admin</span>
-                          )}
+                          <Button
+                            variante="outline"
+                            className="px-3 py-2 text-sm"
+                            onClick={() => abrirDialogo('ban30', u)}
+                          >
+                            30d
+                          </Button>
+                          <Button
+                            variante="danger"
+                            className="px-3 py-2 text-sm"
+                            onClick={() => abrirDialogo('ban', u)}
+                          >
+                            Ban
+                          </Button>
                         </>
+                      ) : (
+                        <Button
+                          className="px-3 py-2 text-sm"
+                          onClick={() => abrirDialogo('desbanear', u)}
+                        >
+                          Desbanear
+                        </Button>
+                      )}
+                      {u.esSuperadmin ? (
+                        <span className="text-xs text-muted">Dueño</span>
+                      ) : u.rol !== 'admin' || esDueño ? (
+                        <Select
+                          className="w-auto"
+                          value=""
+                          onChange={(e) => e.target.value && cambiarRol(u, e.target.value)}
+                        >
+                          <option value="">Rol…</option>
+                          <option value="cliente">Cliente</option>
+                          <option value="trabajador">Trabajador</option>
+                          {esDueño && <option value="admin">Admin</option>}
+                        </Select>
+                      ) : (
+                        <span className="text-xs text-muted">Admin</span>
                       )}
                     </div>
                   )}
@@ -230,6 +493,21 @@ export default function Usuarios() {
             )
           })}
         </div>
+      )}
+
+      {dialogo && (
+        <ConfirmarAccion
+          abierto
+          titulo={DIALOGOS[dialogo.tipo].titulo}
+          mensaje={DIALOGOS[dialogo.tipo].mensaje(dialogo.usuario)}
+          motivoRequerido={Boolean(DIALOGOS[dialogo.tipo].motivo)}
+          etiquetaMotivo="Motivo de la sanción"
+          textoConfirmar={DIALOGOS[dialogo.tipo].textoConfirmar}
+          varianteConfirmar={DIALOGOS[dialogo.tipo].varianteConfirmar}
+          cargando={procesandoDialogo}
+          onConfirmar={confirmarDialogo}
+          onCancelar={() => setDialogo(null)}
+        />
       )}
     </div>
   )

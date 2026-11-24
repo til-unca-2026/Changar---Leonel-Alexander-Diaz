@@ -113,9 +113,15 @@ create table trabajador_oficios (
 - Cada perfil se vincula a una identidad de Supabase Auth mediante el mismo UUID.
 - Un único rol por usuario en el MVP.
 - Un trabajador puede ofrecer varios oficios y un oficio puede tener muchos trabajadores.
-- El rol `admin` **no** se asigna desde el registro público: se crea mediante la RPC
-  `admin_asignar_rol` ejecutada por otro administrador, y el trigger de alta de usuario
-  rechaza explícitamente ese valor.
+- El rol `admin` **no** se asigna desde el registro público: el trigger de alta de usuario
+  rechaza explícitamente ese valor y solo el dueño puede promover a administrador.
+- El **dueño de la app** se marca con `perfiles.es_superadmin` (booleano, no un valor del
+  enum). Es un administrador con la prerrogativa extra de crear cuentas de administrador.
+  Al ser un booleano que ninguna RPC recibe, no existe el camino de código para crear un
+  dueño desde la app: la marca solo se activa con un `UPDATE` manual.
+- Los administradores se crean por **invitación de un solo uso**: el dueño genera un
+  link, la persona se registra con él y queda con rol `admin`. El token es el único factor
+  (el email no lo es, porque el proyecto no exige confirmarlo).
 - Las fotos del portfolio viven en `portfolio_fotos` + Storage, no como listas en el perfil.
 - La separación `perfiles` / `perfiles_trabajador` permite agregar un rol dual en el futuro
   sin duplicar la identidad.
@@ -245,6 +251,84 @@ create table reportes (
   created_at      timestamptz not null default now()
 );
 ```
+
+### Dueño de la app y creación de administradores
+
+El dueño de la app es un administrador con una marca adicional. La marca es un
+booleano en `perfiles` y no un valor del enum `rol_usuario`:
+
+```sql
+alter table perfiles add column es_superadmin boolean not null default false;
+
+create or replace function public.es_superadmin()
+returns boolean
+language sql stable
+security definer
+set search_path = public
+as $$
+  select exists (
+    select 1 from perfiles
+    where id = auth.uid() and es_superadmin and rol = 'admin' and activo
+  );
+$$;
+```
+
+**Por qué un booleano y no un valor del enum:** `admin_cambiar_rol(p_perfil_id, p_rol
+rol_usuario)` recibe el enum, así que un valor `superadmin` dentro del enum abriría la
+puerta a que cualquier administrador se auto-elevara. Con un booleano, ninguna RPC
+recibe la marca: crearla es una decisión manual del dueño.
+
+Jerarquía resultante:
+
+| Acción | Admin | Dueño (`es_superadmin`) |
+|---|---|---|
+| Moderar oficios, reportes y sanciones | Sí | Sí |
+| Marcar, suspender o bloquear a un usuario | Sí | Sí |
+| Crear cuentas de administrador | No | Sí |
+| Dar o quitar el rol `admin` | No | Sí |
+| Modificar la cuenta del dueño | No | No |
+
+Los administradores se crean por invitación, con un link de un solo uso:
+
+```sql
+create table invitaciones_admin (
+  id         uuid primary key default gen_random_uuid(),
+  email      text not null,
+  nombre     text not null default '',
+  apellido  text not null default '',
+  token      uuid not null default gen_random_uuid() unique,
+  estado     text not null default 'pendiente'
+             check (estado in ('pendiente', 'aceptada', 'cancelada', 'expirada')),
+  creado_por uuid not null references perfiles(id) on delete cascade,
+  expira_at  timestamptz,
+  created_at timestamptz not null default now()
+);
+```
+
+La tabla tiene RLS habilitado **sin políticas**: el acceso es únicamente por RPC
+(`security definer`, cada una validando `es_superadmin()`), así que un `select`
+directo devuelve cero filas. Las funciones de administración restringen además el
+permiso de ejecución a `authenticated` (Postgres concede `EXECUTE` a `PUBLIC` por
+defecto en toda función nueva).
+
+El trigger de alta de usuario busca la invitación **por token, nunca por email**:
+
+```sql
+select * into v_inv
+  from invitaciones_admin
+ where token = v_token
+   and estado = 'pendiente'
+   and (expira_at is null or expira_at > now())
+ limit 1;
+```
+
+El email no sirve como factor de confianza porque el proyecto no exige confirmar el
+correo: cualquiera puede registrarse con cualquier dirección, así que una
+invitación buscada por email sería un escalamiento de privilegios. El token (uuid v4)
+sí es un factor criptográfico, se invalida al usarse y expira a los 7 días.
+
+Además, el invited elige su propia contraseña: el dueño nunca maneja credenciales
+ajenas.
 
 ## Extensiones
 

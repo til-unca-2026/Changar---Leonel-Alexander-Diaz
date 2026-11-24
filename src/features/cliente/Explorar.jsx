@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 import { useOficios } from '@/hooks/useSolicitudes.js'
 import * as perfilesRepo from '@/lib/data/perfiles.repo.js'
+import { aproximarCoordenadas } from '@/lib/geo.js'
+import Button from '@/components/ui/Button.jsx'
 import Card from '@/components/ui/Card.jsx'
 import Input from '@/components/ui/Input.jsx'
 import Select from '@/components/ui/Select.jsx'
@@ -13,6 +15,10 @@ export default function Explorar() {
   const [oficioId, setOficioId] = useState('')
   const [zona, setZona] = useState('')
   const [minRating, setMinRating] = useState(0)
+  const [cerca, setCerca] = useState(null)
+  const [radioKm, setRadioKm] = useState(10)
+  const [ubicando, setUbicando] = useState(false)
+  const [geoError, setGeoError] = useState('')
   const [resultados, setResultados] = useState([])
   const [cargando, setCargando] = useState(true)
 
@@ -21,7 +27,15 @@ export default function Explorar() {
     setCargando(true)
     const timer = setTimeout(() => {
       perfilesRepo
-        .buscarTrabajadores({ query, oficioId, zona, minRating })
+        .buscarTrabajadores({
+          query,
+          oficioId,
+          zona,
+          minRating,
+          lat: cerca?.lat ?? null,
+          lng: cerca?.lng ?? null,
+          radioKm: cerca ? radioKm : null,
+        })
         .then((r) => activo && setResultados(r))
         .catch(() => activo && setResultados([]))
         .finally(() => activo && setCargando(false))
@@ -30,7 +44,38 @@ export default function Explorar() {
       activo = false
       clearTimeout(timer)
     }
-  }, [query, oficioId, zona, minRating])
+  }, [query, oficioId, zona, minRating, cerca, radioKm])
+
+  function alternarCerca() {
+    if (cerca) {
+      setCerca(null)
+      setGeoError('')
+      return
+    }
+    setGeoError('')
+    if (!navigator.geolocation) {
+      setGeoError('Tu navegador no permite obtener la ubicación.')
+      return
+    }
+    setUbicando(true)
+    navigator.geolocation.getCurrentPosition(
+      (posicion) => {
+        setCerca(
+          aproximarCoordenadas(posicion.coords.latitude, posicion.coords.longitude),
+        )
+        setUbicando(false)
+      },
+      (err) => {
+        setUbicando(false)
+        setGeoError(
+          err?.code === 1
+            ? 'No diste permiso para usar tu ubicación. Podés buscar por zona.'
+            : 'No pudimos obtener tu ubicación. Probá buscando por zona.',
+        )
+      },
+      { enableHighAccuracy: false, timeout: 10000, maximumAge: 300000 },
+    )
+  }
 
   return (
     <div className="space-y-5">
@@ -70,6 +115,35 @@ export default function Explorar() {
             <option value={5}>5★</option>
           </Select>
         </div>
+
+        <div className="flex flex-wrap items-center gap-2 border-t border-line pt-3">
+          <Button
+            variante={cerca ? 'primary' : 'outline'}
+            className="w-auto"
+            onClick={alternarCerca}
+            disabled={ubicando}
+          >
+            {ubicando ? 'Ubicando…' : cerca ? '✓ Cerca de mí' : 'Cerca de mí'}
+          </Button>
+          {cerca && (
+            <Select
+              className="w-36"
+              value={radioKm}
+              onChange={(e) => setRadioKm(Number(e.target.value))}
+            >
+              <option value={5}>A 5 km</option>
+              <option value={10}>A 10 km</option>
+              <option value={20}>A 20 km</option>
+              <option value={50}>A 50 km</option>
+            </Select>
+          )}
+          {cerca && (
+            <span className="text-xs text-muted">
+              Mostramos profesionales que cubren tu zona, ordenados por cercanía.
+            </span>
+          )}
+        </div>
+        {geoError && <p className="text-xs font-semibold text-danger">{geoError}</p>}
       </Card>
 
       {cargando ? (

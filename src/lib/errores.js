@@ -11,6 +11,8 @@ const MENSAJES = {
   registro_incompleto: 'No pudimos crear tu cuenta. Intentá de nuevo.',
   nombre_vacio: 'El nombre del oficio no puede estar vacío.',
   oficio_no_permitido: 'Ese oficio no está permitido.',
+  oficio_no_encontrado: 'El oficio no existe.',
+  oficio_duplicado: 'Ya existe un oficio con ese nombre.',
   solicitud_no_encontrada: 'La solicitud no existe.',
   solicitud_no_abierta: 'La solicitud ya no acepta propuestas.',
   perfil_incompleto:
@@ -39,6 +41,12 @@ const MENSAJES = {
   oficio_no_disponible: 'Ese oficio no está entre los que ofrece el profesional.',
   profesional_no_disponible:
     'Ese profesional está suspendido y no puede recibir contrataciones por ahora.',
+  email_invalido: 'Ingresá un email válido.',
+  invitacion_ya_existe: 'Ya hay una invitación pendiente para ese email.',
+  invitacion_no_encontrada: 'La invitación no existe, ya fue usada o venció.',
+  no_puede_modificar_al_dueno: 'No podés modificar la cuenta del dueño de la aplicación.',
+  no_puede_modificar_al_admin: 'No podés gestionar la cuenta de otro administrador.',
+  motivo_vacio: 'Escribí el motivo de la sanción.',
 }
 
 const MENSAJES_SUPABASE = {
@@ -66,6 +74,8 @@ export function mensajeError(error) {
   if (/rol_no_permitido/i.test(codigo)) return MENSAJES.rol_no_permitido
   if (/nombre_vacio/i.test(codigo)) return MENSAJES.nombre_vacio
   if (/oficio_no_permitido/i.test(codigo)) return MENSAJES.oficio_no_permitido
+  if (/oficio_no_encontrado/i.test(codigo)) return MENSAJES.oficio_no_encontrado
+  if (/oficio_duplicado/i.test(codigo)) return MENSAJES.oficio_duplicado
   if (/solicitud_no_abierta/i.test(codigo)) return MENSAJES.solicitud_no_abierta
   if (/solicitud_no_encontrada/i.test(codigo)) return MENSAJES.solicitud_no_encontrada
   if (/perfil_incompleto/i.test(codigo)) return MENSAJES.perfil_incompleto
@@ -92,6 +102,12 @@ export function mensajeError(error) {
   if (/destino_invalido/i.test(codigo)) return MENSAJES.destino_invalido
   if (/oficio_no_disponible/i.test(codigo)) return MENSAJES.oficio_no_disponible
   if (/profesional_no_disponible/i.test(codigo)) return MENSAJES.profesional_no_disponible
+  if (/email_invalido/i.test(codigo)) return MENSAJES.email_invalido
+  if (/invitacion_ya_existe/i.test(codigo)) return MENSAJES.invitacion_ya_existe
+  if (/invitacion_no_encontrada/i.test(codigo)) return MENSAJES.invitacion_no_encontrada
+  if (/no_puede_modificar_al_dueno/i.test(codigo)) return MENSAJES.no_puede_modificar_al_dueno
+  if (/no_puede_modificar_al_admin/i.test(codigo)) return MENSAJES.no_puede_modificar_al_admin
+  if (/motivo_vacio/i.test(codigo)) return MENSAJES.motivo_vacio
 
   if (/propuestas_solicitud_id_trabajador_id_key/i.test(codigo)) {
     return 'Ya enviaste una propuesta a esta solicitud.'

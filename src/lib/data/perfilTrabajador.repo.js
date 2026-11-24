@@ -8,7 +8,7 @@ import { supabase } from '@/lib/supabase.js'
 export async function obtener(usuarioId) {
   const { data: perfil, error } = await supabase
     .from('perfiles_trabajador')
-    .select('descripcion, experiencia, ubicacion')
+    .select('descripcion, experiencia, ubicacion, latitud, longitud, radio_km')
     .eq('id', usuarioId)
     .maybeSingle()
   if (error) throw error
@@ -24,14 +24,34 @@ export async function obtener(usuarioId) {
     descripcion: perfil?.descripcion ?? '',
     experiencia: perfil?.experiencia ?? '',
     ubicacion: perfil?.ubicacion ?? '',
+    latitud: perfil?.latitud ?? null,
+    longitud: perfil?.longitud ?? null,
+    radioKm: perfil?.radio_km ?? 10,
     oficios: (relaciones ?? []).map((r) => r.oficio_id),
   }
 }
 
-export async function guardar(usuarioId, { descripcion, experiencia, ubicacion, oficios = [] }) {
-  const { error } = await supabase
-    .from('perfiles_trabajador')
-    .upsert({ id: usuarioId, descripcion, experiencia, ubicacion })
+export async function guardar(
+  usuarioId,
+  {
+    descripcion,
+    experiencia,
+    ubicacion,
+    latitud = null,
+    longitud = null,
+    radioKm = 10,
+    oficios = [],
+  },
+) {
+  const { error } = await supabase.from('perfiles_trabajador').upsert({
+    id: usuarioId,
+    descripcion,
+    experiencia,
+    ubicacion,
+    latitud,
+    longitud,
+    radio_km: radioKm,
+  })
   if (error) throw error
 
   // Reemplazar las relaciones de oficios por el conjunto actual.

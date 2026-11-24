@@ -7,6 +7,7 @@ import * as contratacionesRepo from '@/lib/data/contrataciones.repo.js'
 import { mensajeError } from '@/lib/errores.js'
 import { fechaRelativa, formatearPesos } from '@/lib/format.js'
 import Avatar from '@/components/ui/Avatar.jsx'
+import MapaUbicacion from '@/components/mapa/MapaUbicacion.jsx'
 import ReputacionResumen from '@/components/ReputacionResumen.jsx'
 import PortfolioMini from '@/components/PortfolioMini.jsx'
 import Badge from '@/components/ui/Badge.jsx'
@@ -169,6 +170,21 @@ export default function DetalleSolicitud() {
             <dd className="font-semibold text-ink">{fechaRelativa(solicitud.createdAt)}</dd>
           </div>
         </dl>
+
+        {solicitud.latitud != null && solicitud.longitud != null && (
+          <div className="mt-4 border-t border-line pt-4">
+            <MapaUbicacion
+              label="Zona aproximada"
+              valor={{
+                texto: solicitud.ubicacion,
+                lat: solicitud.latitud,
+                lng: solicitud.longitud,
+              }}
+              soloLectura
+              altura="h-52"
+            />
+          </div>
+        )}
 
         {solicitud.fotos?.length > 0 && (
           <div className="mt-4 grid grid-cols-3 gap-2 sm:grid-cols-4">

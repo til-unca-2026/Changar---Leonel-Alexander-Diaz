@@ -17,14 +17,22 @@ export async function listar() {
   return data ?? []
 }
 
-/** Oficios visibles para el trabajador (activos + propios pendientes). */
-export async function listarParaTrabajador() {
+/**
+ * Oficios visibles para el usuario (activos + los propios pendientes).
+ * Sirve tanto para el perfil del trabajador como para la solicitud del cliente.
+ */
+export async function listarVisibles() {
   const { data, error } = await supabase
     .from('oficios')
     .select('id, nombre, estado')
     .order('nombre')
   if (error) throw error
   return data ?? []
+}
+
+/** Alias histórico usado por el perfil del trabajador. */
+export async function listarParaTrabajador() {
+  return listarVisibles()
 }
 
 /** Sugerencias difusas para atrapar typos. */
@@ -67,6 +75,15 @@ export async function aprobar(oficioId, aprobar) {
   const { error } = await supabase.rpc('admin_aprobar_oficio', {
     p_oficio_id: oficioId,
     p_aprobar: aprobar,
+  })
+  if (error) throw error
+}
+
+/** Admin: corrige el nombre de un oficio (pendiente o del catálogo). */
+export async function renombrar(oficioId, nombre) {
+  const { error } = await supabase.rpc('admin_renombrar_oficio', {
+    p_oficio_id: oficioId,
+    p_nombre: nombre,
   })
   if (error) throw error
 }
