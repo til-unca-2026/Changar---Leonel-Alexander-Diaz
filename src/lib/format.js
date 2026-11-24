@@ -8,6 +8,18 @@ export function formatearPesos(valor) {
   }).format(Number(valor))
 }
 
+/** Fecha y hora completa en formato local, p. ej. "24/11/2026, 14:35". */
+export function fechaHora(iso) {
+  if (!iso) return '—'
+  return new Date(iso).toLocaleString('es-AR', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+}
+
 /** Fecha relativa simple: "Hace 2 días", "Hoy". */
 export function fechaRelativa(iso) {
   const diff = Date.now() - new Date(iso).getTime()

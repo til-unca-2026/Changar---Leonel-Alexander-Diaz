@@ -47,6 +47,7 @@ const ICONOS = {
   oficios: 'M14.7 6.3a4 4 0 0 0 5 5l-9.4 9.4a2.1 2.1 0 0 1-3-3zM14.7 6.3 18 3l3 3-3.3 3.3',
   contrataciones: 'M9 11l3 3L22 4M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11',
   reportes: 'M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1zM4 22v-7',
+  actividad: 'M8 4h8v3H8zM6 6h2v3h8V6h2v14H6zM9 12h6M9 16h6',
 }
 
 const NAV_POR_ROL = {
@@ -90,6 +91,7 @@ const NAV_POR_ROL = {
       { a: '/admin/explorar', icono: 'explorar', texto: 'Explorar' },
       { a: '/admin/usuarios', icono: 'perfil', texto: 'Usuarios' },
       { a: '/admin/oficios', icono: 'oficios', texto: 'Oficios' },
+      { a: '/admin/actividad', icono: 'actividad', texto: 'Actividad' },
       { a: '/admin/reportes', icono: 'reportes', texto: 'Reportes' },
     ],
     desktop: [
@@ -97,6 +99,7 @@ const NAV_POR_ROL = {
       { a: '/admin/explorar', icono: 'explorar', texto: 'Explorar' },
       { a: '/admin/usuarios', icono: 'perfil', texto: 'Usuarios' },
       { a: '/admin/oficios', icono: 'oficios', texto: 'Oficios' },
+      { a: '/admin/actividad', icono: 'actividad', texto: 'Actividad' },
       { a: '/admin/reportes', icono: 'reportes', texto: 'Reportes' },
       { a: '/perfil', icono: 'perfil', texto: 'Mi cuenta' },
     ],
