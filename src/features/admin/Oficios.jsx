@@ -5,6 +5,7 @@ import { mensajeError } from '@/lib/errores.js'
 import Badge from '@/components/ui/Badge.jsx'
 import Button from '@/components/ui/Button.jsx'
 import Card from '@/components/ui/Card.jsx'
+import Input from '@/components/ui/Input.jsx'
 import Select from '@/components/ui/Select.jsx'
 import Spinner from '@/components/ui/Spinner.jsx'
 
@@ -15,6 +16,9 @@ export default function Oficios() {
   const [accionando, setAccionando] = useState(null)
   const [origen, setOrigen] = useState('')
   const [destino, setDestino] = useState('')
+  const [editando, setEditando] = useState(null)
+  const [editNombre, setEditNombre] = useState('')
+  const [guardandoEdit, setGuardandoEdit] = useState(false)
 
   async function recargar() {
     const data = await oficiosRepo.listarTodos()
@@ -61,6 +65,78 @@ export default function Oficios() {
     }
   }
 
+  function iniciarEdicion(o) {
+    setEditando(o.id)
+    setEditNombre(o.nombre)
+  }
+
+  function cancelarEdicion() {
+    setEditando(null)
+    setEditNombre('')
+  }
+
+  async function guardarNombre(id) {
+    const nombre = editNombre.trim()
+    if (!nombre) {
+      mostrar('El nombre no puede quedar vacío.', 'error')
+      return
+    }
+    try {
+      setGuardandoEdit(true)
+      await oficiosRepo.renombrar(id, nombre)
+      await recargar()
+      cancelarEdicion()
+      mostrar('Oficio renombrado.', 'exito')
+    } catch (err) {
+      mostrar(mensajeError(err), 'error')
+    } finally {
+      setGuardandoEdit(false)
+    }
+  }
+
+  async function cambiarEstado(o, activar) {
+    if (
+      !activar &&
+      !window.confirm(`¿Desactivar «${o.nombre}»? Dejará de aparecer en el catálogo y las búsquedas.`)
+    ) {
+      return
+    }
+    try {
+      setAccionando(o.id)
+      await oficiosRepo.aprobar(o.id, activar)
+      await recargar()
+      mostrar(activar ? 'Oficio reactivado.' : 'Oficio desactivado.', 'exito')
+    } catch (err) {
+      mostrar(mensajeError(err), 'error')
+    } finally {
+      setAccionando(null)
+    }
+  }
+
+  function editorDeNombre(o) {
+    if (editando !== o.id) return null
+    return (
+      <div className="flex items-center gap-2">
+        <Input
+          className="min-w-0 flex-1"
+          value={editNombre}
+          onChange={(e) => setEditNombre(e.target.value)}
+          placeholder="Nombre del oficio"
+        />
+        <Button
+          className="px-3 py-2 text-sm"
+          onClick={() => guardarNombre(o.id)}
+          disabled={guardandoEdit}
+        >
+          {guardandoEdit ? 'Guardando…' : 'Guardar'}
+        </Button>
+        <Button variante="ghost" className="px-3 py-2 text-sm" onClick={cancelarEdicion}>
+          Cancelar
+        </Button>
+      </div>
+    )
+  }
+
   if (cargando) {
     return (
       <div className="flex justify-center py-16 text-primary">
@@ -74,7 +150,7 @@ export default function Oficios() {
       <div>
         <h1 className="text-2xl font-extrabold lg:text-3xl">Oficios</h1>
         <p className="mt-1 text-muted">
-          Aprobá los oficios nuevos y fusioná duplicados.
+          Aprobá, corregí el nombre, desactivá oficios y fusioná duplicados.
         </p>
       </div>
 
@@ -91,30 +167,41 @@ export default function Oficios() {
         ) : (
           <div className="grid gap-3 xl:grid-cols-2">
             {pendientes.map((o) => (
-              <Card key={o.id} className="flex items-center justify-between gap-3">
-                <div className="min-w-0">
-                  <p className="truncate font-bold text-ink">{o.nombre}</p>
-                  <Badge estado="pendiente" className="mt-1">
-                    Pendiente
-                  </Badge>
+              <Card key={o.id} className="space-y-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="truncate font-bold text-ink">{o.nombre}</p>
+                    <Badge estado="pendiente" className="mt-1">
+                      Pendiente
+                    </Badge>
+                  </div>
+                  <div className="flex shrink-0 gap-2">
+                    <Button
+                      variante="outline"
+                      className="px-3 py-2 text-sm"
+                      onClick={() => iniciarEdicion(o)}
+                      disabled={guardandoEdit}
+                    >
+                      Renombrar
+                    </Button>
+                    <Button
+                      className="px-3 py-2 text-sm"
+                      onClick={() => resolver(o.id, true)}
+                      disabled={accionando === o.id}
+                    >
+                      Aprobar
+                    </Button>
+                    <Button
+                      variante="outline"
+                      className="px-3 py-2 text-sm"
+                      onClick={() => resolver(o.id, false)}
+                      disabled={accionando === o.id}
+                    >
+                      Rechazar
+                    </Button>
+                  </div>
                 </div>
-                <div className="flex shrink-0 gap-2">
-                  <Button
-                    className="px-3 py-2 text-sm"
-                    onClick={() => resolver(o.id, true)}
-                    disabled={accionando === o.id}
-                  >
-                    Aprobar
-                  </Button>
-                  <Button
-                    variante="outline"
-                    className="px-3 py-2 text-sm"
-                    onClick={() => resolver(o.id, false)}
-                    disabled={accionando === o.id}
-                  >
-                    Rechazar
-                  </Button>
-                </div>
+                {editorDeNombre(o)}
               </Card>
             ))}
           </div>
@@ -166,9 +253,42 @@ export default function Oficios() {
         <h2 className="mb-3 text-lg font-bold">Catálogo</h2>
         <Card className="divide-y divide-line p-0">
           {oficios.map((o) => (
-            <div key={o.id} className="flex items-center justify-between gap-3 px-5 py-3">
-              <p className="min-w-0 truncate font-semibold text-ink">{o.nombre}</p>
-              <Badge estado={o.estado} />
+            <div key={o.id} className="space-y-3 px-5 py-3">
+              <div className="flex items-center justify-between gap-3">
+                <p className="min-w-0 truncate font-semibold text-ink">{o.nombre}</p>
+                <div className="flex shrink-0 items-center gap-2">
+                  <Badge estado={o.estado} />
+                  <Button
+                    variante="ghost"
+                    className="px-3 py-1.5 text-sm"
+                    onClick={() => iniciarEdicion(o)}
+                    disabled={guardandoEdit}
+                  >
+                    Renombrar
+                  </Button>
+                  {o.estado === 'activo' && (
+                    <Button
+                      variante="outline"
+                      className="px-3 py-1.5 text-sm"
+                      onClick={() => cambiarEstado(o, false)}
+                      disabled={accionando === o.id}
+                    >
+                      Desactivar
+                    </Button>
+                  )}
+                  {o.estado === 'inactivo' && (
+                    <Button
+                      variante="outline"
+                      className="px-3 py-1.5 text-sm"
+                      onClick={() => cambiarEstado(o, true)}
+                      disabled={accionando === o.id}
+                    >
+                      Reactivar
+                    </Button>
+                  )}
+                </div>
+              </div>
+              {editorDeNombre(o)}
             </div>
           ))}
         </Card>

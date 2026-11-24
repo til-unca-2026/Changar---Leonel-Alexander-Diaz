@@ -11,6 +11,8 @@ const MENSAJES = {
   registro_incompleto: 'No pudimos crear tu cuenta. Intentá de nuevo.',
   nombre_vacio: 'El nombre del oficio no puede estar vacío.',
   oficio_no_permitido: 'Ese oficio no está permitido.',
+  oficio_no_encontrado: 'El oficio no existe.',
+  oficio_duplicado: 'Ya existe un oficio con ese nombre.',
   solicitud_no_encontrada: 'La solicitud no existe.',
   solicitud_no_abierta: 'La solicitud ya no acepta propuestas.',
   perfil_incompleto:
@@ -72,6 +74,8 @@ export function mensajeError(error) {
   if (/rol_no_permitido/i.test(codigo)) return MENSAJES.rol_no_permitido
   if (/nombre_vacio/i.test(codigo)) return MENSAJES.nombre_vacio
   if (/oficio_no_permitido/i.test(codigo)) return MENSAJES.oficio_no_permitido
+  if (/oficio_no_encontrado/i.test(codigo)) return MENSAJES.oficio_no_encontrado
+  if (/oficio_duplicado/i.test(codigo)) return MENSAJES.oficio_duplicado
   if (/solicitud_no_abierta/i.test(codigo)) return MENSAJES.solicitud_no_abierta
   if (/solicitud_no_encontrada/i.test(codigo)) return MENSAJES.solicitud_no_encontrada
   if (/perfil_incompleto/i.test(codigo)) return MENSAJES.perfil_incompleto

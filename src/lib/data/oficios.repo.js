@@ -79,6 +79,15 @@ export async function aprobar(oficioId, aprobar) {
   if (error) throw error
 }
 
+/** Admin: corrige el nombre de un oficio (pendiente o del catálogo). */
+export async function renombrar(oficioId, nombre) {
+  const { error } = await supabase.rpc('admin_renombrar_oficio', {
+    p_oficio_id: oficioId,
+    p_nombre: nombre,
+  })
+  if (error) throw error
+}
+
 /** Fusiona un oficio duplicado en otro. */
 export async function fusionar(origen, destino) {
   const { error } = await supabase.rpc('admin_fusionar_oficios', {
