@@ -13,6 +13,7 @@ import Button from '@/components/ui/Button.jsx'
 import Card from '@/components/ui/Card.jsx'
 import FileDrop from '@/components/ui/FileDrop.jsx'
 import Spinner from '@/components/ui/Spinner.jsx'
+import TelefonoContacto from '@/components/TelefonoContacto.jsx'
 import Textarea from '@/components/ui/Textarea.jsx'
 import Bitacora from './Bitacora.jsx'
 
@@ -308,12 +309,16 @@ export default function DetalleContratacion() {
 
       {/* Contacto */}
       {contacto && (
-        <Card className="border-primary/30 bg-primary-soft">
-          <h2 className="font-bold text-ink">Contacto para coordinar</h2>
+        <Card className="border-success/30 bg-success/5">
+          <h2 className="font-bold text-ink">
+            Contactá a {contraparte?.nombre ?? 'la contraparte'} para coordinar la reunión
+          </h2>
           <p className="mt-1 text-sm text-muted">
             La coordinación de fecha, hora y dirección se hace por fuera de la plataforma.
           </p>
-          <p className="mt-2 text-lg font-extrabold text-primary">{contacto}</p>
+          <div className="mt-3">
+            <TelefonoContacto telefono={contacto} nombre={contraparte?.nombre} />
+          </div>
         </Card>
       )}
 

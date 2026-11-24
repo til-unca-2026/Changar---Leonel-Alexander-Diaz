@@ -1,19 +1,20 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '@/context/AuthContext.jsx'
-import { useOficios } from '@/hooks/useSolicitudes.js'
 import { useToast } from '@/components/ui/Toast.jsx'
 import * as solicitudesRepo from '@/lib/data/solicitudes.repo.js'
 import * as perfilClienteRepo from '@/lib/data/perfilCliente.repo.js'
 import * as perfilesRepo from '@/lib/data/perfiles.repo.js'
 import { mensajeError } from '@/lib/errores.js'
 import { formatearPesos } from '@/lib/format.js'
+import { mismaZona } from '@/lib/geo.js'
+import MapaUbicacion from '@/components/mapa/MapaUbicacion.jsx'
+import OficioPicker from '@/features/oficios/OficioPicker.jsx'
 import Avatar from '@/components/ui/Avatar.jsx'
 import Button from '@/components/ui/Button.jsx'
 import Card from '@/components/ui/Card.jsx'
 import Input from '@/components/ui/Input.jsx'
 import Textarea from '@/components/ui/Textarea.jsx'
-import Select from '@/components/ui/Select.jsx'
 import FileDrop from '@/components/ui/FileDrop.jsx'
 
 const VACIO = {
@@ -21,10 +22,12 @@ const VACIO = {
   titulo: '',
   descripcion: '',
   ubicacion: '',
+  latitud: null,
+  longitud: null,
   presupuestoMax: '',
 }
 
-function TarjetaPreview({ nombreOficio, form, fotos }) {
+function TarjetaPreview({ nombreOficio, form, fotos, avisoZona, zonaPerfil }) {
   return (
     <Card>
       <p className="text-sm font-semibold text-primary">
@@ -50,6 +53,13 @@ function TarjetaPreview({ nombreOficio, form, fotos }) {
         </div>
       </dl>
 
+      {avisoZona && (
+        <p className="mt-3 rounded-xl bg-amber-50 px-3 py-2 text-xs font-semibold text-warning">
+          Esta ubicación es distinta a tu zona de perfil ({zonaPerfil?.texto}). Los
+          profesionales verán la zona que elegiste para este trabajo.
+        </p>
+      )}
+
       {fotos.length > 0 && (
         <div className="mt-4 border-t border-line pt-4">
           <p className="text-xs font-semibold text-muted">Fotos ({fotos.length})</p>
@@ -73,7 +83,6 @@ function TarjetaPreview({ nombreOficio, form, fotos }) {
 
 export default function NuevaSolicitud() {
   const { usuario } = useAuth()
-  const oficios = useOficios()
   const { mostrar } = useToast()
   const navigate = useNavigate()
   const [params] = useSearchParams()
@@ -82,6 +91,8 @@ export default function NuevaSolicitud() {
 
   const [paso, setPaso] = useState('form')
   const [form, setForm] = useState(VACIO)
+  const [nombreOficio, setNombreOficio] = useState('')
+  const [zonaPerfil, setZonaPerfil] = useState(null)
   const [fotos, setFotos] = useState([])
   const [error, setError] = useState('')
   const [enviando, setEnviando] = useState(false)
@@ -90,16 +101,39 @@ export default function NuevaSolicitud() {
   const [cargandoDestino, setCargandoDestino] = useState(Boolean(trabajadorParam))
 
   const esPersonal = Boolean(trabajadorParam)
-  const opciones = esPersonal ? oficiosDestino : oficios
-  const nombreOficio = opciones.find((o) => o.id === form.oficioId)?.nombre ?? ''
+  const avisoZona = Boolean(
+    zonaPerfil?.texto &&
+      form.ubicacion &&
+      !mismaZona(
+        { texto: form.ubicacion, lat: form.latitud, lng: form.longitud },
+        zonaPerfil,
+      ),
+  )
 
   // Precarga la ubicación con la zona declarada en el perfil del cliente.
   useEffect(() => {
     if (usuario?.rol !== 'cliente') return undefined
     let activo = true
     perfilClienteRepo.obtener(usuario.id).then((perfil) => {
-      if (activo && perfil.zona) {
-        setForm((f) => (f.ubicacion ? f : { ...f, ubicacion: perfil.zona }))
+      if (!activo) return
+      if (perfil.zona || perfil.latitud) {
+        setZonaPerfil({
+          texto: perfil.zona,
+          lat: perfil.latitud,
+          lng: perfil.longitud,
+        })
+      }
+      if (perfil.zona || perfil.latitud) {
+        setForm((f) =>
+          f.ubicacion
+            ? f
+            : {
+                ...f,
+                ubicacion: perfil.zona ?? '',
+                latitud: perfil.latitud ?? null,
+                longitud: perfil.longitud ?? null,
+              },
+        )
       }
     })
     return () => {
@@ -126,9 +160,10 @@ export default function NuevaSolicitud() {
         setDestino(perfil)
         setOficiosDestino(oficiosTrabajador)
         const elegido =
-          oficiosTrabajador.find((o) => o.id === oficioParam)?.id ?? oficiosTrabajador[0]?.id
+          oficiosTrabajador.find((o) => o.id === oficioParam) ?? oficiosTrabajador[0]
         if (elegido) {
-          setForm((f) => (f.oficioId ? f : { ...f, oficioId: elegido }))
+          setForm((f) => (f.oficioId ? f : { ...f, oficioId: elegido.id }))
+          setNombreOficio((actual) => actual || elegido.nombre)
         }
       })
       .catch(() => {})
@@ -140,6 +175,21 @@ export default function NuevaSolicitud() {
 
   function campo(nombre) {
     return (e) => setForm((f) => ({ ...f, [nombre]: e.target.value }))
+  }
+
+  function cambiarOficio(id, oficio) {
+    setForm((f) => ({ ...f, oficioId: id }))
+    setNombreOficio(oficio?.nombre ?? '')
+  }
+
+  function usarZonaPerfil() {
+    if (!zonaPerfil) return
+    setForm((f) => ({
+      ...f,
+      ubicacion: zonaPerfil.texto ?? '',
+      latitud: zonaPerfil.lat ?? null,
+      longitud: zonaPerfil.lng ?? null,
+    }))
   }
 
   function irAPreview(e) {
@@ -163,6 +213,8 @@ export default function NuevaSolicitud() {
         titulo: form.titulo,
         descripcion: form.descripcion,
         ubicacion: form.ubicacion,
+        latitud: form.latitud,
+        longitud: form.longitud,
         presupuestoMax: form.presupuestoMax || null,
         fotos,
         trabajadorDestinoId: destino?.id ?? null,
@@ -202,7 +254,13 @@ export default function NuevaSolicitud() {
           Previsualización — {destino ? 'todavía no fue enviada' : 'todavía no está publicada'}
         </div>
 
-        <TarjetaPreview nombreOficio={nombreOficio} form={form} fotos={fotos} />
+        <TarjetaPreview
+          nombreOficio={nombreOficio}
+          form={form}
+          fotos={fotos}
+          avisoZona={avisoZona}
+          zonaPerfil={zonaPerfil}
+        />
 
         {error && <p className="text-sm font-semibold text-danger">{error}</p>}
 
@@ -254,19 +312,16 @@ export default function NuevaSolicitud() {
       <div className="grid gap-6 lg:grid-cols-2 lg:items-start">
         <form onSubmit={irAPreview} className="space-y-4">
           <div>
-            <Select
+            <OficioPicker
               label="¿Qué servicio necesitás?"
-              name="oficioId"
               value={form.oficioId}
-              onChange={campo('oficioId')}
-            >
-              <option value="">Elegí un oficio</option>
-              {opciones.map((o) => (
-                <option key={o.id} value={o.id}>
-                  {o.nombre}
-                </option>
-              ))}
-            </Select>
+              onChange={cambiarOficio}
+              permitirCrear={!esPersonal}
+              opciones={esPersonal ? oficiosDestino : null}
+              placeholder={
+                esPersonal ? 'Elegí uno de sus oficios…' : 'Buscar o agregar un oficio…'
+              }
+            />
             {esPersonal && (
               <p
                 className={`mt-1.5 text-xs ${
@@ -300,24 +355,45 @@ export default function NuevaSolicitud() {
             placeholder="Contá qué necesitás, el problema y cualquier detalle útil."
           />
 
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Input
-              label="Ubicación"
-              name="ubicacion"
-              value={form.ubicacion}
-              onChange={campo('ubicacion')}
-              placeholder="Ej: Villa Crespo, CABA"
-            />
-            <Input
-              label="Presupuesto máximo (opcional)"
-              name="presupuestoMax"
-              type="number"
-              min="0"
-              value={form.presupuestoMax}
-              onChange={campo('presupuestoMax')}
-              placeholder="Ej: 15000"
-            />
-          </div>
+          <MapaUbicacion
+            label="Ubicación de la solicitud"
+            valor={{ texto: form.ubicacion, lat: form.latitud, lng: form.longitud }}
+            onChange={({ texto, lat, lng }) =>
+              setForm((f) => ({
+                ...f,
+                ubicacion: texto ?? '',
+                latitud: lat ?? null,
+                longitud: lng ?? null,
+              }))
+            }
+            ayuda="Tu perfil ya tiene una zona. Si el trabajo es en otro lugar, cambiala acá."
+            altura="h-60"
+          />
+
+          {avisoZona && (
+            <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5 text-sm text-warning">
+              <p className="font-semibold">
+                La ubicación es distinta a tu zona de perfil ({zonaPerfil?.texto}).
+              </p>
+              <button
+                type="button"
+                onClick={usarZonaPerfil}
+                className="mt-1 font-bold text-link hover:underline"
+              >
+                Usar mi zona de perfil
+              </button>
+            </div>
+          )}
+
+          <Input
+            label="Presupuesto máximo (opcional)"
+            name="presupuestoMax"
+            type="number"
+            min="0"
+            value={form.presupuestoMax}
+            onChange={campo('presupuestoMax')}
+            placeholder="Ej: 15000"
+          />
 
           <div>
             <p className="mb-1.5 text-sm font-semibold text-ink">Fotos (opcional)</p>
@@ -340,7 +416,13 @@ export default function NuevaSolicitud() {
           <p className="mb-2 text-xs font-bold uppercase tracking-wide text-muted">
             Previsualización
           </p>
-          <TarjetaPreview nombreOficio={nombreOficio} form={form} fotos={fotos} />
+          <TarjetaPreview
+            nombreOficio={nombreOficio}
+            form={form}
+            fotos={fotos}
+            avisoZona={avisoZona}
+            zonaPerfil={zonaPerfil}
+          />
         </div>
       </div>
     </div>

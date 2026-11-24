@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom'
+import { formatearDistancia } from '@/lib/geo.js'
 import Avatar from '@/components/ui/Avatar.jsx'
 import InsigniaReputacion from '@/components/InsigniaReputacion.jsx'
 import Button from '@/components/ui/Button.jsx'
@@ -35,6 +36,11 @@ export default function TarjetaProfesional({ perfil, oficioFiltro = '' }) {
             {perfil.nombre} {perfil.apellido}
           </Link>
           {perfil.zona && <p className="truncate text-xs text-muted">{perfil.zona}</p>}
+          {perfil.distanciaKm != null && (
+            <p className="text-xs font-semibold text-primary">
+              A {formatearDistancia(perfil.distanciaKm)} de tu ubicación
+            </p>
+          )}
           <div className="mt-1">
             <InsigniaReputacion datos={datos} perfilId={perfil.id} />
           </div>

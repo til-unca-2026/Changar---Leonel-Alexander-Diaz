@@ -34,7 +34,7 @@ export async function obtenerTrabajador(id) {
     obtenerBase(id),
     supabase
       .from('perfiles_trabajador')
-      .select('descripcion, experiencia, ubicacion')
+      .select('descripcion, experiencia, ubicacion, latitud, longitud, radio_km')
       .eq('id', id)
       .maybeSingle(),
     supabase
@@ -53,6 +53,9 @@ export async function obtenerTrabajador(id) {
     descripcion: pt.data?.descripcion ?? '',
     experiencia: pt.data?.experiencia ?? '',
     ubicacion: pt.data?.ubicacion ?? '',
+    latitud: pt.data?.latitud ?? null,
+    longitud: pt.data?.longitud ?? null,
+    radioKm: pt.data?.radio_km ?? 10,
     oficios: (relaciones.data ?? [])
       .filter((r) => r.oficios?.estado === 'activo')
       .map((r) => r.oficios.nombre),
@@ -67,13 +70,15 @@ export async function obtenerCliente(id) {
   const base = await obtenerBase(id)
   const { data: pc } = await supabase
     .from('perfiles_cliente')
-    .select('zona, descripcion')
+    .select('zona, descripcion, latitud, longitud')
     .eq('id', id)
     .maybeSingle()
   return {
     ...base,
     zona: pc?.zona ?? '',
     descripcion: pc?.descripcion ?? '',
+    latitud: pc?.latitud ?? null,
+    longitud: pc?.longitud ?? null,
   }
 }
 
@@ -180,13 +185,27 @@ export async function oficiosDe(trabajadorId) {
     .map((r) => ({ id: r.oficio_id, nombre: r.oficios.nombre }))
 }
 
-/** Busca trabajadores con perfil completo, por texto, oficio, zona y reputación. */
-export async function buscarTrabajadores({ query, oficioId, zona, minRating } = {}) {
+/**
+ * Busca trabajadores con perfil completo por texto, oficio, zona y reputación.
+ * Si se pasan coordenadas y radio, filtra además por cercanía.
+ */
+export async function buscarTrabajadores({
+  query,
+  oficioId,
+  zona,
+  minRating,
+  lat,
+  lng,
+  radioKm,
+} = {}) {
   const { data, error } = await supabase.rpc('buscar_trabajadores', {
     p_query: query?.trim() || null,
     p_oficio_id: oficioId || null,
     p_zona: zona?.trim() || null,
     p_min_rating: minRating || 0,
+    p_lat: lat ?? null,
+    p_lng: lng ?? null,
+    p_radio_km: radioKm ?? null,
   })
   if (error) throw error
 
@@ -198,6 +217,10 @@ export async function buscarTrabajadores({ query, oficioId, zona, minRating } = 
     zona: p.zona ?? '',
     descripcion: p.descripcion ?? '',
     experiencia: p.experiencia ?? '',
+    latitud: p.latitud ?? null,
+    longitud: p.longitud ?? null,
+    radioKm: p.radio_km ?? 10,
+    distanciaKm: p.distancia_km ?? null,
     oficios: p.oficios ?? [],
     totalValoraciones: p.total_valoraciones ?? 0,
     promedio: p.promedio ?? 0,

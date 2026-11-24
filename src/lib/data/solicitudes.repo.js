@@ -28,6 +28,8 @@ function mapear(s) {
     titulo: s.titulo,
     descripcion: s.descripcion,
     ubicacion: s.ubicacion,
+    latitud: s.latitud ?? null,
+    longitud: s.longitud ?? null,
     presupuestoMax: s.presupuesto_max,
     estado: s.estado,
     createdAt: s.created_at,
@@ -48,6 +50,8 @@ export async function crear({
   titulo,
   descripcion,
   ubicacion,
+  latitud = null,
+  longitud = null,
   presupuestoMax,
   fotos = [],
   trabajadorDestinoId = null,
@@ -61,6 +65,8 @@ export async function crear({
       titulo: titulo.trim(),
       descripcion: descripcion.trim(),
       ubicacion: ubicacion.trim(),
+      latitud,
+      longitud,
       presupuesto_max: presupuestoMax ? Number(presupuestoMax) : null,
     })
     .select('id')

@@ -5,6 +5,7 @@ import { useToast } from '@/components/ui/Toast.jsx'
 import * as perfilRepo from '@/lib/data/perfilTrabajador.repo.js'
 import { subirAvatar } from '@/lib/data/almacenamiento.js'
 import { calcularCompletitud } from '@/lib/perfil.js'
+import MapaUbicacion from '@/components/mapa/MapaUbicacion.jsx'
 import Button from '@/components/ui/Button.jsx'
 import Card from '@/components/ui/Card.jsx'
 import Input from '@/components/ui/Input.jsx'
@@ -66,6 +67,9 @@ export default function PerfilTrabajador({ modo = 'edicion', onGuardado }) {
   const [descripcion, setDescripcion] = useState('')
   const [experiencia, setExperiencia] = useState('')
   const [ubicacion, setUbicacion] = useState('')
+  const [latitud, setLatitud] = useState(null)
+  const [longitud, setLongitud] = useState(null)
+  const [radioKm, setRadioKm] = useState(10)
   const [oficios, setOficios] = useState([])
 
   useEffect(() => {
@@ -75,6 +79,9 @@ export default function PerfilTrabajador({ modo = 'edicion', onGuardado }) {
       setDescripcion(perfil.descripcion ?? '')
       setExperiencia(perfil.experiencia ?? '')
       setUbicacion(perfil.ubicacion ?? '')
+      setLatitud(perfil.latitud ?? null)
+      setLongitud(perfil.longitud ?? null)
+      setRadioKm(perfil.radioKm ?? 10)
       setOficios(perfil.oficios ?? [])
       setCargando(false)
     })
@@ -96,7 +103,15 @@ export default function PerfilTrabajador({ modo = 'edicion', onGuardado }) {
         datos.avatar = await subirAvatar(usuario.id, avatarFile)
       }
       await actualizarUsuario(datos)
-      await perfilRepo.guardar(usuario.id, { descripcion, experiencia, ubicacion, oficios })
+      await perfilRepo.guardar(usuario.id, {
+        descripcion,
+        experiencia,
+        ubicacion,
+        latitud,
+        longitud,
+        radioKm: Math.min(100, Math.max(1, Number(radioKm) || 10)),
+        oficios,
+      })
       mostrar('Perfil actualizado.', 'exito')
       onGuardado?.()
     } catch {
@@ -169,12 +184,34 @@ export default function PerfilTrabajador({ modo = 'edicion', onGuardado }) {
               onChange={(e) => setExperiencia(e.target.value)}
               placeholder="Años de experiencia, formación, tipos de trabajo."
             />
-            <Input
-              label="Ubicación"
-              value={ubicacion}
-              onChange={(e) => setUbicacion(e.target.value)}
-              placeholder="Ej: Villa Crespo, CABA"
+            <MapaUbicacion
+              label="Zona de trabajo"
+              valor={{ texto: ubicacion, lat: latitud, lng: longitud }}
+              onChange={({ texto, lat, lng }) => {
+                setUbicacion(texto ?? '')
+                setLatitud(lat ?? null)
+                setLongitud(lng ?? null)
+              }}
+              modo="punto"
+              radioKm={Number(radioKm) || 0}
+              ayuda="Elegí tu base y hasta dónde podés moverte. Los clientes ven tu zona aproximada, no tu dirección exacta."
+              altura="h-56"
             />
+            <div>
+              <Input
+                label="Radio de cobertura (km)"
+                name="radioKm"
+                type="number"
+                min="1"
+                max="100"
+                step="1"
+                value={radioKm}
+                onChange={(e) => setRadioKm(e.target.value)}
+              />
+              <p className="mt-1 text-xs text-muted">
+                Solo vas a aparecer en búsquedas de clientes dentro de este radio.
+              </p>
+            </div>
           </Card>
 
           <Card>

@@ -8,6 +8,7 @@ import * as solicitudesRepo from '@/lib/data/solicitudes.repo.js'
 import { subirAvatar } from '@/lib/data/almacenamiento.js'
 import { mensajeError } from '@/lib/errores.js'
 import AvatarUploader from '@/features/trabajador/AvatarUploader.jsx'
+import MapaUbicacion from '@/components/mapa/MapaUbicacion.jsx'
 import Button from '@/components/ui/Button.jsx'
 import Card from '@/components/ui/Card.jsx'
 import Input from '@/components/ui/Input.jsx'
@@ -36,6 +37,8 @@ export default function Perfil() {
   const [telefono, setTelefono] = useState(usuario?.telefono ?? '')
   const [avatarFile, setAvatarFile] = useState(null)
   const [zona, setZona] = useState('')
+  const [latitud, setLatitud] = useState(null)
+  const [longitud, setLongitud] = useState(null)
   const [descripcion, setDescripcion] = useState('')
   const [stats, setStats] = useState(null)
 
@@ -50,6 +53,8 @@ export default function Perfil() {
       .then((p) => {
         if (!activo) return
         setZona(p.zona)
+        setLatitud(p.latitud)
+        setLongitud(p.longitud)
         setDescripcion(p.descripcion)
       })
       .finally(() => activo && setCargando(false))
@@ -103,7 +108,7 @@ export default function Perfil() {
 
       await actualizarUsuario(datos)
       if (esCliente) {
-        await perfilClienteRepo.guardar(usuario.id, { zona, descripcion })
+        await perfilClienteRepo.guardar(usuario.id, { zona, descripcion, latitud, longitud })
       }
       setAvatarFile(null)
       mostrar('Datos actualizados.', 'exito')
@@ -175,15 +180,17 @@ export default function Perfil() {
       {esCliente && (
         <Card className="space-y-4">
           <h2 className="font-bold">Sobre vos</h2>
-          <Input
+          <MapaUbicacion
             label="Zona donde vivís"
-            value={zona}
-            onChange={(e) => setZona(e.target.value)}
-            placeholder="Ej: Villa Crespo, CABA"
+            valor={{ texto: zona, lat: latitud, lng: longitud }}
+            onChange={({ texto, lat, lng }) => {
+              setZona(texto ?? '')
+              setLatitud(lat ?? null)
+              setLongitud(lng ?? null)
+            }}
+            ayuda="Solo guardamos una zona aproximada, no tu dirección exacta. Se usa para ubicar tus solicitudes."
+            altura="h-56"
           />
-          <p className="-mt-2 text-xs text-muted">
-            Solo la zona, no la dirección. Se usa para ubicar tus solicitudes.
-          </p>
           <Textarea
             label="Descripción (opcional)"
             value={descripcion}

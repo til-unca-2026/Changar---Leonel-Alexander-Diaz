@@ -5,6 +5,7 @@ import { useToast } from '@/components/ui/Toast.jsx'
 import * as adminRepo from '@/lib/data/admin.repo.js'
 import * as perfilesRepo from '@/lib/data/perfiles.repo.js'
 import * as valoracionesRepo from '@/lib/data/valoraciones.repo.js'
+import * as contratacionesRepo from '@/lib/data/contrataciones.repo.js'
 import { mensajeError } from '@/lib/errores.js'
 import { fechaRelativa } from '@/lib/format.js'
 import Avatar from '@/components/ui/Avatar.jsx'
@@ -14,6 +15,8 @@ import Card from '@/components/ui/Card.jsx'
 import ConfirmarAccion from '@/components/ui/ConfirmarAccion.jsx'
 import Spinner from '@/components/ui/Spinner.jsx'
 import Textarea from '@/components/ui/Textarea.jsx'
+import MapaUbicacion from '@/components/mapa/MapaUbicacion.jsx'
+import TelefonoContacto from '@/components/TelefonoContacto.jsx'
 
 const ROL = {
   cliente: 'Cliente',
@@ -114,6 +117,7 @@ export default function PublicProfile() {
   const [accion, setAccion] = useState(null)
   const [aplicando, setAplicando] = useState(false)
   const [recarga, setRecarga] = useState(0)
+  const [telefono, setTelefono] = useState(null)
 
   useEffect(() => {
     let activo = true
@@ -157,6 +161,24 @@ export default function PublicProfile() {
       activo = false
     }
   }, [id, recarga])
+
+  // El teléfono solo es legible (RLS) si hay una contratación en curso o
+  // completada entre el visitante y la dueña del perfil. Los admin tienen
+  // permiso de lectura general, pero acá no tienen contexto que justificar.
+  useEffect(() => {
+    if (!usuario?.id || usuario.id === id || usuario.rol === 'admin') {
+      setTelefono(null)
+      return undefined
+    }
+    let activo = true
+    contratacionesRepo
+      .contacto(id)
+      .then((tel) => activo && setTelefono(tel))
+      .catch(() => activo && setTelefono(null))
+    return () => {
+      activo = false
+    }
+  }, [id, usuario?.id, recarga])
 
   const esAdmin = usuario?.rol === 'admin'
   const esSuperadmin = Boolean(usuario?.esSuperadmin)
@@ -341,7 +363,39 @@ export default function PublicProfile() {
                 <p className="mt-1 whitespace-pre-line text-sm text-muted">{perfil.experiencia}</p>
               </div>
             )}
-            {perfil.ubicacion && <p className="text-sm text-muted">📍 {perfil.ubicacion}</p>}
+            {perfil.ubicacion && (
+              <p className="text-sm text-muted">
+                📍 {perfil.ubicacion}
+                {perfil.latitud != null && Number(perfil.radioKm) > 0
+                  ? ` · cobertura ${perfil.radioKm} km`
+                  : ''}
+              </p>
+            )}
+            {perfil.latitud != null && perfil.longitud != null && (
+              <MapaUbicacion
+                label="Zona de trabajo"
+                valor={{
+                  texto: perfil.ubicacion,
+                  lat: perfil.latitud,
+                  lng: perfil.longitud,
+                }}
+                modo="punto"
+                radioKm={perfil.radioKm}
+                soloLectura
+                altura="h-48"
+              />
+            )}
+            {telefono && (
+              <div>
+                <h3 className="text-sm font-bold">Teléfono</h3>
+                <p className="mt-0.5 text-xs text-muted">
+                  Lo ves porque tienen una contratación en curso o completada.
+                </p>
+                <div className="mt-2">
+                  <TelefonoContacto telefono={telefono} nombre={perfil.nombre} />
+                </div>
+              </div>
+            )}
           </Card>
 
           {perfil.oficios?.length > 0 && (
@@ -384,6 +438,29 @@ export default function PublicProfile() {
             <div>
               <h2 className="font-bold">Zona</h2>
               <p className="mt-1 text-sm text-ink">{perfil.zona}</p>
+            </div>
+          )}
+          {perfil.latitud != null && perfil.longitud != null && (
+            <MapaUbicacion
+              label="Zona aproximada"
+              valor={{
+                texto: perfil.zona,
+                lat: perfil.latitud,
+                lng: perfil.longitud,
+              }}
+              soloLectura
+              altura="h-48"
+            />
+          )}
+          {telefono && (
+            <div>
+              <h2 className="font-bold">Teléfono</h2>
+              <p className="mt-0.5 text-xs text-muted">
+                Lo ves porque tienen una contratación en curso o completada.
+              </p>
+              <div className="mt-2">
+                <TelefonoContacto telefono={telefono} nombre={perfil.nombre} />
+              </div>
             </div>
           )}
           {perfil.descripcion && (

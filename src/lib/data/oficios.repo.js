@@ -17,14 +17,22 @@ export async function listar() {
   return data ?? []
 }
 
-/** Oficios visibles para el trabajador (activos + propios pendientes). */
-export async function listarParaTrabajador() {
+/**
+ * Oficios visibles para el usuario (activos + los propios pendientes).
+ * Sirve tanto para el perfil del trabajador como para la solicitud del cliente.
+ */
+export async function listarVisibles() {
   const { data, error } = await supabase
     .from('oficios')
     .select('id, nombre, estado')
     .order('nombre')
   if (error) throw error
   return data ?? []
+}
+
+/** Alias histórico usado por el perfil del trabajador. */
+export async function listarParaTrabajador() {
+  return listarVisibles()
 }
 
 /** Sugerencias difusas para atrapar typos. */
